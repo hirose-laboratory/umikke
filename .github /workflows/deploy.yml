@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy Frontend (Build Only)
 
 on:
   push:
@@ -6,8 +6,7 @@ on:
       - main
 
 jobs:
-  backend-deploy:
-    name: Deploy to Server
+  deploy:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -16,19 +15,25 @@ jobs:
     - name: Install sshpass
       run: sudo apt-get update && sudo apt-get install -y sshpass rsync
 
-    - name: Sync files via rsync
+    - name: Sync source code
       env:
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
       run: |
         sshpass -e rsync -avzr --delete \
-          --exclude="__pycache__" \
           --exclude=".git" \
           --exclude=".github" \
+          --exclude="node_modules" \
+          --exclude=".next" \
           --exclude=".env" \
-          --exclude=".gitignore" \
-          --exclude="storage" \
-          --exclude=".venv" \
-          --exclude="secret.yaml" \
-          --exclude="*.keras" \
           -e "ssh -o StrictHostKeyChecking=no" \
-          ./ ubuntu@27.133.132.208:${{ secrets.REMOTE_PATH }}
+          ./ ubuntu@27.133.132.208:/home/ubuntu/frontend/umikke/
+
+    - name: Build Project
+      env:
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+      run: |
+        sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@27.133.132.208 << 'EOF'
+          cd /home/ubuntu/frontend/umikke/
+          npm install
+          npm run build
+        EOF
