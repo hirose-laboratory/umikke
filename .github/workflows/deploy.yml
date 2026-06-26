@@ -1,0 +1,39 @@
+name: Deploy Frontend (Build Only)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install sshpass
+      run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+
+    - name: Sync source code
+      env:
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+      run: |
+        sshpass -e rsync -avzr --delete \
+          --exclude=".git" \
+          --exclude=".github" \
+          --exclude="node_modules" \
+          --exclude=".next" \
+          --exclude=".env" \
+          -e "ssh -o StrictHostKeyChecking=no" \
+          ./ ubuntu@27.133.132.208:/home/ubuntu/frontend/umikke/
+
+    - name: Build Project
+      env:
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+      run: |
+        sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@27.133.132.208 << 'EOF'
+          cd /home/ubuntu/frontend/umikke/umikke
+          npm install
+          npm run build
+        EOF
