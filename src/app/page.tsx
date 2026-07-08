@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
 // Google Mapsの各クラスのインスタンス型を明示的に定義（any完全排除）
 interface GoogleMapInstance {
@@ -11,6 +11,7 @@ interface GoogleMapInstance {
 type GoogleLatLngInstance = object;
 type GoogleHeatmapLayerInstance = {
   setData: (data: object[]) => void;
+  setOptions: (options: object) => void;
 };
 
 interface GoogleMarkerInstance {
@@ -72,15 +73,28 @@ interface TimelineDay {
   date: Date;
 }
 
+// FastAPI (/ocean/range/) から返ってくる海洋データ1件分の型
+// schemas.py の OceanDataResponse に対応
+interface OceanDataPoint {
+  id: number;
+  latitude: number;
+  longitude: number;
+  record_timestamp: string; // ISO日時文字列
+  sst: number | null;         // 水温(℃)
+  cha: number | null;         // クロロフィルa濃度
+  current_speed: number | null;
+  current_direction: number | null;
+}
+
 export default function HeatmapPage() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null); 
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
 
-  // 本日の日付・時間（初期化用）
-  const initDate = new Date();
-  const initHour = initDate.getHours();
+  // 取得対象データの初期表示日（2026年5月1日固定：FastAPIから取得するのが2026年5月のデータのため）
+  const initDate = new Date(2026, 4, 1); // 月は0始まりなので 4 = 5月
+  const initHour = 0;
 
   // --- 状態管理 (State) ---
   const [baseDate, setBaseDate] = useState<Date>(initDate); 
@@ -102,9 +116,22 @@ export default function HeatmapPage() {
   // Windy風右側メニューの開閉状態
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
 
+  // --- 海洋データ(FastAPI /ocean/range/)関連の状態 ---
+  // 2026年5月全期間のデータを取得し、時間で絞り込まず「まとめて」ヒートマップに表示する
+  // (将来的にタイムラインと連動させたくなったら、ここをoceanBucketsRef方式に戻せばよい)
+  const oceanPointsRef = useRef<OceanDataPoint[]>([]);
+  const [oceanLoading, setOceanLoading] = useState<boolean>(true);
+  const [oceanError, setOceanError] = useState<string | null>(null);
+  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0); // データ取得完了を検知して再描画をトリガーするためのカウンタ
+  const [oceanPointCount, setOceanPointCount] = useState<number>(0); // 取得件数(画面表示用)
+  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null); // 現在表示中データのSST最小・最大値（凡例表示用）
+  const [mapReady, setMapReady] = useState<boolean>(false); // Google Map & HeatmapLayerの初期化完了フラグ
+
   // 現在選択されている「日（0〜6）」と「時間（0〜23）」を計算
   const currentDayIndex = Math.floor(currentProgress / 24);
   const currentHour = currentProgress % 24;
+
+  // currentDayIndex / currentHour は上で計算済み
 
     const timelineDays = useMemo(() => {
     const days: TimelineDay[] = [];
@@ -134,31 +161,82 @@ export default function HeatmapPage() {
     };
   }, [isPlaying]);
 
-  // 時間(currentProgress)が変わるたびに、ヒートマップデータをリアルタイムに変形させる
-  useEffect(() => {
+  // ヒートマップの座標データ(実データ: sst=水温)を生成してレイヤーに反映する共通関数
+  // ※ 地図初期化完了時(mapReady)と、海洋データ取得完了時(oceanDataVersion)の両方から呼び出す
+  // 5月全期間のデータをまとめて表示するので、時刻による絞り込みは行わない
+  const updateHeatmapData = useCallback(() => {
     if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
 
     const google = window.google;
-    const bounds = { north: 34.419, south: 34.223, east: 136.957, west: 136.682 };
-    const mockPoints = [];
+    const allPoints = oceanPointsRef.current;
 
-    for (let i = 0; i < 60; i++) {
-      const timeFactor = currentProgress * 0.05; 
-      const seed = i + timeFactor;
-      const latShift = (Math.sin(seed) + 1) / 2;
-      const lngShift = (Math.cos(seed * 0.8) + 1) / 2;
+    // sstがnullの地点は除外し、weight(重み)にsst(水温)をそのまま使用
+    const points = allPoints
+      .filter((p) => p.sst !== null && p.sst !== undefined)
+      .map((p) => ({
+        location: new google.maps.LatLng(p.latitude, p.longitude),
+        weight: p.sst as number,
+      }));
 
-      mockPoints.push({
-        location: new google.maps.LatLng(
-          latShift * (bounds.north - bounds.south) + bounds.south,
-          lngShift * (bounds.east - bounds.west) + bounds.west
-        ),
-        weight: Math.floor(((Math.sin(i + timeFactor * 1.5) + 1) / 2) * 900) + 100
-      });
+    heatmapLayerRef.current.setData(points);
+
+    if (points.length > 0) {
+      const weights = points.map((p) => p.weight);
+      const min = Math.min(...weights);
+      const max = Math.max(...weights);
+      setSstRange({ min, max });
+      // 水温の実際の値域(通常十数〜30℃程度)に合わせてmaxIntensityを動的に調整し、
+      // 見た目の濃淡が水温の高低を反映するようにする
+      heatmapLayerRef.current.setOptions({ maxIntensity: max, radius: 40 });
+    } else {
+      setSstRange(null);
+    }
+  }, []);
+
+  // マップ準備完了、または海洋データ取得完了のたびにヒートマップを再描画する
+  useEffect(() => {
+    if (!mapReady) return;
+    updateHeatmapData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, oceanDataVersion, updateHeatmapData]);
+
+  // 2026年5月の海洋データをFastAPI経由(Next.jsのAPIルート/api/ocean)で一括取得
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchOceanData() {
+      setOceanLoading(true);
+      setOceanError(null);
+      try {
+        const start = '2026-05-01T00:00:00';
+        const end = '2026-05-31T23:59:59';
+        const res = await fetch(
+          `/api/ocean?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`
+        );
+        if (!res.ok) {
+          throw new Error(`データ取得に失敗しました (status: ${res.status})`);
+        }
+        const data: OceanDataPoint[] = await res.json();
+        if (cancelled) return;
+
+        oceanPointsRef.current = data;
+        setOceanPointCount(data.length);
+        setOceanDataVersion((v) => v + 1);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('海洋データ取得エラー:', err);
+          setOceanError(err instanceof Error ? err.message : '不明なエラーが発生しました');
+        }
+      } finally {
+        if (!cancelled) setOceanLoading(false);
+      }
     }
 
-    heatmapLayerRef.current.setData(mockPoints);
-  }, [currentProgress, timelineDays]);
+    fetchOceanData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 初回の地図初期化
   useEffect(() => {
@@ -215,6 +293,10 @@ export default function HeatmapPage() {
         opacity: 0.85,
         maxIntensity: 1000
       });
+
+      // HeatmapLayer生成完了をstateで通知 → 上のuseEffectが検知して
+      // その時点で選択されている日時のヒートマップデータを描画する
+      setMapReady(true);
 
       function getCustomIcon(colorUrl: string): Spot['icon'] {
         return {
@@ -299,6 +381,7 @@ export default function HeatmapPage() {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- カレンダー生成用ロジック ---
@@ -457,12 +540,24 @@ export default function HeatmapPage() {
             </div>
           </div>
 
-          {/* 左下スライダー */}
+          {/* 左下スライダー（凡例：水温 sst の実際の値域を表示） */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '20px', fontSize: '28px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
-            <span>低</span>
+            <span>{sstRange ? `${sstRange.min.toFixed(1)}℃` : '低'}</span>
             <div className="slider-bar" style={{ width: '240px', height: '20px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '10px' }}></div>
-            <span>高</span>
+            <span>{sstRange ? `${sstRange.max.toFixed(1)}℃` : '高'}</span>
           </div>
+
+          {/* 海洋データ(FastAPI)の取得状況表示 */}
+          {(oceanLoading || oceanError) && (
+            <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
+              {oceanError ? `海洋データ取得エラー: ${oceanError}` : '2026年5月の海洋データを読み込み中...'}
+            </div>
+          )}
+          {!oceanLoading && !oceanError && oceanPointCount > 0 && (
+            <div style={{ position: 'absolute', top: '30px', left: '30px', background: 'rgba(0,0,0,0.55)', color: 'white', padding: '10px 22px', borderRadius: '30px', fontSize: '20px', pointerEvents: 'none' }}>
+              2026年5月の海洋データ {oceanPointCount.toLocaleString()}件を表示中(水温ヒートマップ)
+            </div>
+          )}
 
           {/* 下部タイムラインコンテナ */}
           <div className="bottom-bar" style={{ position: 'absolute', bottom: '40px', left: '30px', width: 'calc(100% - 150px)', maxWidth: '1200px', background: '#888', borderRadius: '24px', minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px 32px', color: 'white', gap: '16px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', boxSizing: 'border-box', pointerEvents: 'auto' }}>
