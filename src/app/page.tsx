@@ -705,7 +705,7 @@ export default function HeatmapPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>SETTINGS</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px',cursor: 'pointer' }}>
                   <input type="checkbox" defaultChecked style={{ width: '28px', height: '28px', accentColor: '#0044cc' }} /> 漁場ピンの名前を常に表示
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px', cursor: 'pointer' }}>
