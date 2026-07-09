@@ -164,15 +164,37 @@ export default function HeatmapPage() {
   // ヒートマップの座標データ(実データ: sst=水温)を生成してレイヤーに反映する共通関数
   // ※ 地図初期化完了時(mapReady)と、海洋データ取得完了時(oceanDataVersion)の両方から呼び出す
   // 5月全期間のデータをまとめて表示するので、時刻による絞り込みは行わない
+// ヒートマップの座標データ(実データ: sst=水温)を生成してレイヤーに反映する共通関数
+  // タイムラインで選択されている「日時」に合致するデータのみをフィルタリングして表示します
   const updateHeatmapData = useCallback(() => {
     if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
 
     const google = window.google;
     const allPoints = oceanPointsRef.current;
 
-    // sstがnullの地点は除外し、weight(重み)にsst(水温)をそのまま使用
+    // 1. 現在タイムライン上で選択されている日時（Date型）を計算
+    const targetDate = new Date(baseDate);
+    targetDate.setHours(targetDate.getHours() + currentProgress);
+
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = targetDate.getMonth();
+    const targetDateNum = targetDate.getDate();
+    const targetHour = targetDate.getHours();
+
+    // 2. 全データの中から、選択された日時に一致するデータのみを抽出
     const points = allPoints
-      .filter((p) => p.sst !== null && p.sst !== undefined)
+      .filter((p) => {
+        if (p.sst === null || p.sst === undefined) return false;
+
+        // APIから取得した record_timestamp (ISO文字列) をDate型に変換して日時を比較
+        const pDate = new Date(p.record_timestamp);
+        return (
+          pDate.getFullYear() === targetYear &&
+          pDate.getMonth() === targetMonth &&
+          pDate.getDate() === targetDateNum &&
+          pDate.getHours() === targetHour
+        );
+      })
       .map((p) => ({
         location: new google.maps.LatLng(p.latitude, p.longitude),
         weight: p.sst as number,
@@ -183,15 +205,16 @@ export default function HeatmapPage() {
     if (points.length > 0) {
       const weights = points.map((p) => p.weight);
       const min = Math.min(...weights);
-      const max = Math.max(...weights);
-      setSstRange({ min, max });
-      // 水温の実際の値域(通常十数〜30℃程度)に合わせてmaxIntensityを動的に調整し、
-      // 見た目の濃淡が水温の高低を反映するようにする
+      const max = Math.min(...weights) === Math.max(...weights) ? Math.max(...weights) + 1 : Math.max(...weights); // 同値対策
+      setSstRange({ min, max: Math.max(...weights) });
+      
+      // データ数や値域に応じて見やすさを調整
       heatmapLayerRef.current.setOptions({ maxIntensity: max, radius: 40 });
     } else {
       setSstRange(null);
     }
-  }, []);
+  // 3. 依存配列に baseDate と currentProgress を追加し、時刻変化を検知できるようにする
+  }, [baseDate, currentProgress]);
 
   // マップ準備完了、または海洋データ取得完了のたびにヒートマップを再描画する
   useEffect(() => {
