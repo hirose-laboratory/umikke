@@ -234,7 +234,7 @@ export default function HeatmapPage() {
         const start = '2026-05-01T00:00:00';
         const end = '2026-05-31T23:59:59';
         const res = await fetch(
-          `/api/ocean?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`
+          `http://27.133.132.208:8000/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
         if (!res.ok) {
           throw new Error(`データ取得に失敗しました (status: ${res.status})`);
@@ -270,7 +270,7 @@ export default function HeatmapPage() {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
       newScript.async = true;
       newScript.defer = true;
       newScript.onload = () => initMap();
