@@ -74,7 +74,6 @@ interface TimelineDay {
 }
 
 // FastAPI (/ocean/range/) から返ってくる海洋データ1件分の型
-// schemas.py の OceanDataResponse に対応
 interface OceanDataPoint {
   id: number;
   latitude: number;
@@ -92,13 +91,15 @@ export default function HeatmapPage() {
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
 
-  // 取得対象データの初期表示日（2026年5月1日固定：FastAPIから取得するのが2026年5月のデータのため）
-  const initDate = new Date(2026, 4, 1); // 月は0始まりなので 4 = 5月
-  const initHour = 0;
+  // デフォルトの日程を「今日の日付」に設定
+  const initDate = useMemo(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }, []);
 
   // --- 状態管理 (State) ---
   const [baseDate, setBaseDate] = useState<Date>(initDate); 
-  const [currentProgress, setCurrentProgress] = useState<number>(initHour); 
+  const [currentProgress, setCurrentProgress] = useState<number>(0); // 0〜6日目を表す
   const [isPlaying, setIsPlaying] = useState<boolean>(false); 
   
   // ミニカレンダー用の状態
@@ -116,24 +117,19 @@ export default function HeatmapPage() {
   // Windy風右側メニューの開閉状態
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
 
-  // --- 海洋データ(FastAPI /ocean/range/)関連の状態 ---
-  // 2026年5月全期間のデータを取得し、時間で絞り込まず「まとめて」ヒートマップに表示する
-  // (将来的にタイムラインと連動させたくなったら、ここをoceanBucketsRef方式に戻せばよい)
+  // --- 海洋データ(FastAPI)関連の状態 ---
   const oceanPointsRef = useRef<OceanDataPoint[]>([]);
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
   const [oceanError, setOceanError] = useState<string | null>(null);
-  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0); // データ取得完了を検知して再描画をトリガーするためのカウンタ
-  const [oceanPointCount, setOceanPointCount] = useState<number>(0); // 取得件数(画面表示用)
-  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null); // 現在表示中データのSST最小・最大値（凡例表示用）
-  const [mapReady, setMapReady] = useState<boolean>(false); // Google Map & HeatmapLayerの初期化完了フラグ
+  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0); 
+  const [oceanPointCount, setOceanPointCount] = useState<number>(0); 
+  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null); 
+  const [mapReady, setMapReady] = useState<boolean>(false); 
 
-  // 現在選択されている「日（0〜6）」と「時間（0〜23）」を計算
-  const currentDayIndex = Math.floor(currentProgress / 24);
-  const currentHour = currentProgress % 24;
+  // スライダーの進捗度から、現在選択されている「日」のインデックスを取得
+  const currentDayIndex = currentProgress;
 
-  // currentDayIndex / currentHour は上で計算済み
-
-    const timelineDays = useMemo(() => {
+  const timelineDays = useMemo(() => {
     const days: TimelineDay[] = [];
     const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
     
@@ -145,54 +141,57 @@ export default function HeatmapPage() {
         date: d
       });
     }
-    return days; // setTimelineDaysの代わりにreturnする
+    return days; 
   }, [baseDate]);
 
-  // 超なめらかアニメーション
+  // 現在選択されている具体的な日付オブジェクトを計算
+  const selectedFullDate = useMemo(() => {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + currentProgress);
+    return d;
+  }, [baseDate, currentProgress]);
+
+  // 日付表示用の文字列
+  const formattedSelectedDate = useMemo(() => {
+    const y = selectedFullDate.getFullYear();
+    const m = selectedFullDate.getMonth() + 1;
+    const d = selectedFullDate.getDate();
+    return `${y}年${m}月${d}日`;
+  }, [selectedFullDate]);
+
+  // 日単位のアニメーション（1秒ごとに1日進む）
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isPlaying) {
       intervalId = setInterval(() => {
-        setCurrentProgress((prev) => (prev + 1) % 168); 
-      }, 50); 
+        setCurrentProgress((prev) => (prev + 1) % 7); 
+      }, 1000); 
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isPlaying]);
 
-  // ヒートマップの座標データ(実データ: sst=水温)を生成してレイヤーに反映する共通関数
-  // ※ 地図初期化完了時(mapReady)と、海洋データ取得完了時(oceanDataVersion)の両方から呼び出す
-  // 5月全期間のデータをまとめて表示するので、時刻による絞り込みは行わない
-// ヒートマップの座標データ(実データ: sst=水温)を生成してレイヤーに反映する共通関数
-  // タイムラインで選択されている「日時」に合致するデータのみをフィルタリングして表示します
+  // ヒートマップデータを日付ごとにフィルタリングしてレイヤーに反映する関数
   const updateHeatmapData = useCallback(() => {
     if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
 
     const google = window.google;
     const allPoints = oceanPointsRef.current;
 
-    // 1. 現在タイムライン上で選択されている日時（Date型）を計算
-    const targetDate = new Date(baseDate);
-    targetDate.setHours(targetDate.getHours() + currentProgress);
+    const targetYear = selectedFullDate.getFullYear();
+    const targetMonth = selectedFullDate.getMonth();
+    const targetDateNum = selectedFullDate.getDate();
 
-    const targetYear = targetDate.getFullYear();
-    const targetMonth = targetDate.getMonth();
-    const targetDateNum = targetDate.getDate();
-    const targetHour = targetDate.getHours();
-
-    // 2. 全データの中から、選択された日時に一致するデータのみを抽出
+    // 選択された「年月日」に合致するデータのみを抽出（時刻は無視して1日分をマージ）
     const points = allPoints
       .filter((p) => {
         if (p.sst === null || p.sst === undefined) return false;
-
-        // APIから取得した record_timestamp (ISO文字列) をDate型に変換して日時を比較
         const pDate = new Date(p.record_timestamp);
         return (
           pDate.getFullYear() === targetYear &&
           pDate.getMonth() === targetMonth &&
-          pDate.getDate() === targetDateNum &&
-          pDate.getHours() === targetHour
+          pDate.getDate() === targetDateNum
         );
       })
       .map((p) => ({
@@ -205,25 +204,21 @@ export default function HeatmapPage() {
     if (points.length > 0) {
       const weights = points.map((p) => p.weight);
       const min = Math.min(...weights);
-      const max = Math.min(...weights) === Math.max(...weights) ? Math.max(...weights) + 1 : Math.max(...weights); // 同値対策
+      const max = Math.min(...weights) === Math.max(...weights) ? Math.max(...weights) + 1 : Math.max(...weights);
       setSstRange({ min, max: Math.max(...weights) });
-      
-      // データ数や値域に応じて見やすさを調整
-      heatmapLayerRef.current.setOptions({ maxIntensity: max, radius: 40 });
+      heatmapLayerRef.current.setOptions({ maxIntensity: max, radius: 45 });
     } else {
       setSstRange(null);
     }
-  // 3. 依存配列に baseDate と currentProgress を追加し、時刻変化を検知できるようにする
-  }, [baseDate, currentProgress]);
+  }, [selectedFullDate]);
 
-  // マップ準備完了、または海洋データ取得完了のたびにヒートマップを再描画する
+  // マップ準備完了、またはデータ更新・スライダー変更のたびにヒートマップを再描画
   useEffect(() => {
     if (!mapReady) return;
     updateHeatmapData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, oceanDataVersion, updateHeatmapData]);
 
-  // 2026年5月の海洋データをFastAPI経由(Next.jsのAPIルート/api/ocean)で一括取得
+  // 2026年5月の海洋データをFastAPI経由で一括取得（5月全域を対象とする）
   useEffect(() => {
     let cancelled = false;
 
@@ -233,6 +228,7 @@ export default function HeatmapPage() {
       try {
         const start = '2026-05-01T00:00:00';
         const end = '2026-05-31T23:59:59';
+        // FastAPIサーバーのURL（環境に合わせてポート等を適宜調整してください）
         const res = await fetch(
           `http://27.133.132.208:8000/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
@@ -270,6 +266,7 @@ export default function HeatmapPage() {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+      // バージョンを3.64に固定してHeatmapLayerの完全削除を一時的に回避
       newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
       newScript.async = true;
       newScript.defer = true;
@@ -288,8 +285,8 @@ export default function HeatmapPage() {
       const google = window.google;
 
       const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 34.350, lng: 136.870 },
-        zoom: 12,
+        center: { lat: 34.420, lng: 136.880 }, // 伊勢志摩・鳥羽地域が見やすい初期位置
+        zoom: 11,
         mapTypeId: 'roadmap',
         styles: [
           { elementType: 'labels', stylers: [{ visibility: 'off' }] },
@@ -312,13 +309,11 @@ export default function HeatmapPage() {
         data: [],
         map: map,
         gradient: customGradient,
-        radius: 12,
+        radius: 15,
         opacity: 0.85,
-        maxIntensity: 1000
+        maxIntensity: 25
       });
 
-      // HeatmapLayer生成完了をstateで通知 → 上のuseEffectが検知して
-      // その時点で選択されている日時のヒートマップデータを描画する
       setMapReady(true);
 
       function getCustomIcon(colorUrl: string): Spot['icon'] {
@@ -334,7 +329,7 @@ export default function HeatmapPage() {
 
       const spots: Spot[] = [
         {
-          position: { lat: 34.340, lng: 136.885 },
+          position: { lat: 34.485, lng: 136.842 },
           title: 'アジ・サバ・ヒラメ・カレイ混合エリア',
           content: `
             <div class="info-window-content">
@@ -351,7 +346,7 @@ export default function HeatmapPage() {
           icon: getCustomIcon('https://maps.google.com/mapfiles/ms/icons/red-dot.png')
         },
         {
-          position: { lat: 34.320, lng: 136.910 },
+          position: { lat: 34.502, lng: 136.861 },
           title: '東部アウターエッジ：アジ・サバホットスポット',
           content: `
             <div class="info-window-content">
@@ -366,22 +361,6 @@ export default function HeatmapPage() {
           `,
           initialOpen: false,
           icon: getCustomIcon('https://maps.google.com/mapfiles/ms/icons/green-dot.png')
-        },
-        {
-          position: { lat: 34.310, lng: 136.905 },
-          title: 'ヒラメ・カレイホットスポット',
-          content: `
-            <div class="info-window-content">
-                <h3 style="margin: 0 0 16px 0; font-size: 34px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 8px; font-weight: bold;">ヒラメ・カレイ漁獲可</h3>
-                <ul style="margin: 0; padding-left: 36px; font-size: 28px; color: #333; list-style-type: disc;">
-                    <li style="margin-bottom: 8px;">マヒラメ（着底多数検知）</li>
-                    <li style="margin-bottom: 8px;">マコガレイ（好漁場）</li>
-                    <li style="margin-bottom: 8px;">うつぼ（一部混在）</li>
-                </ul>
-            </div>
-          `,
-          initialOpen: false,
-          icon: getCustomIcon('https://maps.google.com/mapfiles/ms/icons/yellow-dot.png')
         }
       ];
 
@@ -404,7 +383,6 @@ export default function HeatmapPage() {
         }
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- カレンダー生成用ロジック ---
@@ -473,9 +451,8 @@ export default function HeatmapPage() {
             });
           }
         },
-        (error) => {
-          alert('位置情報の取得に失敗しました。ブラウザの位置情報許可を確認してください。');
-          console.error(error);
+        () => {
+          alert('位置情報の取得に失敗しました。');
         }
       );
     } else {
@@ -505,8 +482,6 @@ export default function HeatmapPage() {
 
           {/* 右側レイヤー切り替えメニュー */}
           <div className="right-sidebar" style={{ position: 'absolute', top: '140px', right: '30px', display: 'flex', flexDirection: 'column', gap: '24px', pointerEvents: 'auto' }}>
-            
-            {/* 海況状況パネル */}
             <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div className="layer-btn" onClick={() => setShowMarinePanel(!showMarinePanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
                 <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -536,7 +511,6 @@ export default function HeatmapPage() {
               )}
             </div>
 
-            {/* 魚種分布パネル */}
             <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
                 <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -563,22 +537,22 @@ export default function HeatmapPage() {
             </div>
           </div>
 
-          {/* 左下スライダー（凡例：水温 sst の実際の値域を表示） */}
+          {/* 左下凡例 */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '20px', fontSize: '28px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span>{sstRange ? `${sstRange.min.toFixed(1)}℃` : '低'}</span>
             <div className="slider-bar" style={{ width: '240px', height: '20px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '10px' }}></div>
             <span>{sstRange ? `${sstRange.max.toFixed(1)}℃` : '高'}</span>
           </div>
 
-          {/* 海洋データ(FastAPI)の取得状況表示 */}
+          {/* 取得状況表示 */}
           {(oceanLoading || oceanError) && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
-              {oceanError ? `海洋データ取得エラー: ${oceanError}` : '2026年5月の海洋データを読み込み中...'}
+              {oceanError ? `海洋データ取得エラー: ${oceanError}` : '海洋データを同期中...'}
             </div>
           )}
           {!oceanLoading && !oceanError && oceanPointCount > 0 && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: 'rgba(0,0,0,0.55)', color: 'white', padding: '10px 22px', borderRadius: '30px', fontSize: '20px', pointerEvents: 'none' }}>
-              2026年5月の海洋データ {oceanPointCount.toLocaleString()}件を表示中(水温ヒートマップ)
+              全データ {oceanPointCount.toLocaleString()} 件から抽出（日単位ヒートマップ）
             </div>
           )}
 
@@ -601,7 +575,7 @@ export default function HeatmapPage() {
                   <span 
                     key={idx} 
                     onClick={() => {
-                      setCurrentProgress(idx * 24 + currentHour); 
+                      setCurrentProgress(idx); 
                       setIsPlaying(false);
                     }}
                     style={{ 
@@ -664,7 +638,7 @@ export default function HeatmapPage() {
                               <button
                                 onClick={() => {
                                   setBaseDate(new Date(calYear, calMonth, dateNum));
-                                  setCurrentProgress(currentHour); 
+                                  setCurrentProgress(0); 
                                   setShowMiniCalendar(false);
                                   setIsPlaying(false);
                                 }}
@@ -682,15 +656,14 @@ export default function HeatmapPage() {
                   </div>
                 )}
               </div>
-
             </div>
 
-            {/* 下段：シークバー ＆ 現在時間表示 */}
+            {/* 下段：シークバー ＆ 日付表示 */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <input 
                 type="range" 
                 min="0" 
-                max="167" 
+                max="6"  // 0〜6日目の7段階スライダー
                 value={currentProgress}
                 onChange={(e) => {
                   setCurrentProgress(Number(e.target.value));
@@ -702,10 +675,9 @@ export default function HeatmapPage() {
               />
               
               <div style={{ fontSize: '24px', textAlign: 'left', color: '#e0e0e0', fontWeight: 'bold', paddingLeft: '4px' }}>
-                選択時刻: <span style={{ color: '#ffdd55' }}>{currentHour < 10 ? `0${currentHour}` : currentHour}:00</span>
+                選択日: <span style={{ color: '#ffdd55' }}>{formattedSelectedDate}</span>
               </div>
             </div>
-
           </div>
 
           {/* 右下コントロールパネル */}
@@ -733,7 +705,6 @@ export default function HeatmapPage() {
                   background: 'white', borderRadius: '32px', padding: '48px', width: '560px', boxShadow: '0 12px 36px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '28px', color: '#333', position: 'relative', boxSizing: 'border-box'
                 }}
               >
-                {/* ↓↓↓ ここの justify.Content を justifyContent に修正しました！ ↓↓↓ */}
                 <button onClick={() => setShowLoginModal(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '44px' }}>close</span>
                 </button>
@@ -761,17 +732,11 @@ export default function HeatmapPage() {
                   </svg>
                   Googleでログイン
                 </button>
-                <div style={{ textAlign: 'center', marginTop: '12px', borderTop: '2px solid #eee', paddingTop: '24px' }}>
-                  <span style={{ fontSize: '24px', color: '#666' }}>アカウントをお持ちでないですか？</span>
-                  <div style={{ marginTop: '10px' }}>
-                    <a href="#register" style={{ fontSize: '26px', color: '#0044cc', textDecoration: 'none', fontWeight: 'bold' }}>新規会員登録はこちら</a>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
-          {/* Windy風 右スライドインメニュー */}
+          {/* Windy風 右メニュー */}
           <div 
             onClick={() => setShowWindyMenu(false)}
             style={{
@@ -795,13 +760,6 @@ export default function HeatmapPage() {
             </div>
 
             <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '40px', flexGrow: 1, overflowY: 'auto' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>ACCOUNT</div>
-                <button onClick={() => { setShowWindyMenu(false); setShowLoginModal(true); }} style={{ width: '100%', background: '#333', border: '1px solid #444', padding: '20px', borderRadius: '12px', color: 'white', fontSize: '26px', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <span className="material-symbols-outlined" style={{ color: '#0044cc' }}>verified_user</span> プレミアムプランを試す
-                </button>
-              </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>MAP DISPLAY OPTIONS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -812,31 +770,7 @@ export default function HeatmapPage() {
                     <option>地形・白地図</option>
                   </select>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '26px', color: '#ccc' }}>
-                    <span>レイヤーの不透明度</span>
-                    <span>85%</span>
-                  </div>
-                  <input type="range" min="10" max="100" defaultValue="85" style={{ width: '100%', accentColor: '#0044cc', background: '#444', height: '8px', borderRadius: '4px' }} />
-                </div>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>SETTINGS</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px',cursor: 'pointer' }}>
-                  <input type="checkbox" defaultChecked style={{ width: '28px', height: '28px', accentColor: '#0044cc' }} /> 漁場ピンの名前を常に表示
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px', cursor: 'pointer' }}>
-                  <input type="checkbox" style={{ width: '28px', height: '28px', accentColor: '#0044cc' }} /> グリッド（緯度経度線）を表示
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '26px', cursor: 'pointer' }}>
-                  <input type="checkbox" defaultChecked style={{ width: '28px', height: '28px', accentColor: '#0044cc' }} /> 12時間表記（AM/PM表示に変更）
-                </label>
-              </div>
-            </div>
-
-            <div style={{ padding: '24px 32px', borderTop: '1px solid #444', fontSize: '22px', color: '#666', textAlign: 'center', background: '#1a1a1a' }}>
-              海況データビューアー v2.4.0
             </div>
           </div>
 
