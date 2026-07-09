@@ -25,10 +25,9 @@ jobs:
           --exclude="node_modules" \
           --exclude=".next" \
           --exclude=".env" \
-          --exclude=".env.local" \  # ← この行を追加
+          --exclude=".env.local" \
           -e "ssh -o StrictHostKeyChecking=no" \
           ./ ubuntu@27.133.132.208:/home/ubuntu/frontend/umikke/
-
     - name: Build Project
       env:
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
