@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
-// Google Mapsの各クラスのインスタンス型を明示的に定義（any完全排除）
+
 interface GoogleMapInstance {
   getZoom: () => number;
   setZoom: (zoom: number) => void;
