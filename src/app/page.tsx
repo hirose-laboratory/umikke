@@ -1,8 +1,13 @@
 'use client';
 
+// ==========================================
+// 1. インポート・外部ライブラリ
+// ==========================================
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
-
+// ==========================================
+// 2. 型定義 (TypeScript Interfaces)
+// ==========================================
 interface GoogleMapInstance {
   getZoom: () => number;
   setZoom: (zoom: number) => void;
@@ -13,7 +18,6 @@ type GoogleHeatmapLayerInstance = {
   setData: (data: object[]) => void;
   setOptions: (options: object) => void;
 };
-
 interface GoogleMarkerInstance {
   addListener: (event: string, handler: () => void) => void;
   setPosition: (latLng: object) => void;
@@ -79,13 +83,20 @@ interface OceanDataPoint {
   latitude: number;
   longitude: number;
   record_timestamp: string; // ISO日時文字列
-  sst: number | null;         // 水温(℃)
-  cha: number | null;         // クロロフィルa濃度
+  sst: number | null;       // 水温(℃)
+  cha: number | null;       // クロロフィルa濃度
   current_speed: number | null;
   current_direction: number | null;
 }
 
+// ==========================================
+// 3. メインコンポーネント
+// ==========================================
 export default function HeatmapPage() {
+  
+  // ==========================================
+  // 4. 状態管理 (State & Refs)
+  // ==========================================
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null); 
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
@@ -97,7 +108,6 @@ export default function HeatmapPage() {
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   }, []);
 
-  // --- 状態管理 (State) ---
   const [baseDate, setBaseDate] = useState<Date>(initDate); 
   const [currentProgress, setCurrentProgress] = useState<number>(0); // 0〜6日目を表す
   const [isPlaying, setIsPlaying] = useState<boolean>(false); 
@@ -111,24 +121,111 @@ export default function HeatmapPage() {
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
 
-  // ログインモーダルの表示・非表示状態
-  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
-
   // Windy風右側メニューの開閉状態
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
 
-  // --- 海洋データ(FastAPI)関連の状態 ---
+  // 海洋データ(FastAPI)関連の状態
   const oceanPointsRef = useRef<OceanDataPoint[]>([]);
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
   const [oceanError, setOceanError] = useState<string | null>(null);
-  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0); 
+  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0);
   const [oceanPointCount, setOceanPointCount] = useState<number>(0); 
-  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null); 
+  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null);
   const [mapReady, setMapReady] = useState<boolean>(false); 
 
-  // スライダーの進捗度から、現在選択されている「日」のインデックスを取得
-  const currentDayIndex = currentProgress;
+  // ログイン・認証用の状態
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
 
+
+  // ==========================================
+  // 5. 認証機能 (自前API通信によるログイン処理)
+  // ==========================================
+  
+  // .env からAPIのベースURLを取得 (未設定時はヒートマップAPIと同じIPを想定したテスト用URL)
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
+
+  // メールアドレスとパスワードでのログイン
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      alert('メールアドレスとパスワードを入力してください。');
+      return;
+    }
+    try {
+      // ヒートマップと同じ要領で、バックエンドのログインAPIにデータを送信 (POST通信)
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error('ログインに失敗しました');
+      }
+
+      const data = await response.json();
+      console.log('ログイン成功:', data);
+      
+      // 成功した場合、取得したトークンなどを保存する処理をここに入れます
+      // localStorage.setItem('token', data.access_token);
+
+      alert(`ログインしました！`);
+      setShowLoginModal(false);
+    } catch (error: any) {
+      console.error('ログインエラー:', error);
+      alert('ログインに失敗しました。入力内容を確認してください。');
+    }
+  };
+
+  // パスワードを忘れた場合のメール送信
+  const handlePasswordReset = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!email) {
+      alert('パスワードをリセットするには、まずメールアドレスを入力してください。');
+      return;
+    }
+    try {
+      // バックエンドのパスワードリセットAPIを呼び出し
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        throw new Error('メール送信に失敗しました');
+      }
+
+      alert(`${email} 宛にパスワードリセットのメールを送信しました。`);
+    } catch (error: any) {
+      console.error('パスワードリセットエラー:', error);
+      alert('メールの送信に失敗しました。');
+    }
+  };
+
+  // Googleアカウントでのログイン
+  const handleGoogleLogin = () => {
+    // APIのOAuth認証ページ（Googleログイン画面）へ直接リダイレクトさせる方法
+    // 認証完了後にバックエンドから元の画面へリダイレクト(コールバック)させます
+    window.location.href = `${API_BASE_URL}/auth/login/google`;
+  };
+
+  // Appleアカウントでのログイン
+  const handleAppleLogin = () => {
+    // 同様にAPI側のApple認証ページへリダイレクト
+    window.location.href = `${API_BASE_URL}/auth/login/apple`;
+  };
+
+
+  // ==========================================
+  // 6. データ処理・カレンダー計算ロジック
+  // ==========================================
+  const currentDayIndex = currentProgress;
   const timelineDays = useMemo(() => {
     const days: TimelineDay[] = [];
     const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -144,14 +241,12 @@ export default function HeatmapPage() {
     return days; 
   }, [baseDate]);
 
-  // 現在選択されている具体的な日付オブジェクトを計算
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + currentProgress);
     return d;
   }, [baseDate, currentProgress]);
 
-  // 日付表示用の文字列
   const formattedSelectedDate = useMemo(() => {
     const y = selectedFullDate.getFullYear();
     const m = selectedFullDate.getMonth() + 1;
@@ -172,7 +267,6 @@ export default function HeatmapPage() {
     };
   }, [isPlaying]);
 
-  // ヒートマップデータを日付ごとにフィルタリングしてレイヤーに反映する関数
   const updateHeatmapData = useCallback(() => {
     if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
 
@@ -183,7 +277,6 @@ export default function HeatmapPage() {
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
 
-    // 選択された「年月日」に合致するデータのみを抽出（時刻は無視して1日分をマージ）
     const points = allPoints
       .filter((p) => {
         if (p.sst === null || p.sst === undefined) return false;
@@ -212,13 +305,15 @@ export default function HeatmapPage() {
     }
   }, [selectedFullDate]);
 
-  // マップ準備完了、またはデータ更新・スライダー変更のたびにヒートマップを再描画
   useEffect(() => {
     if (!mapReady) return;
     updateHeatmapData();
   }, [mapReady, oceanDataVersion, updateHeatmapData]);
 
-  // 2026年5月の海洋データをFastAPI経由で一括取得（5月全域を対象とする）
+
+  // ==========================================
+  // 7. 外部API (FastAPI) / Google Maps 初期化
+  // ==========================================
   useEffect(() => {
     let cancelled = false;
 
@@ -228,10 +323,10 @@ export default function HeatmapPage() {
       try {
         const start = '2026-05-01T00:00:00';
         const end = '2026-05-31T23:59:59';
-        // FastAPIサーバーのURL（環境に合わせてポート等を適宜調整してください）
         const res = await fetch(
           `http://27.133.132.208:8000/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
+ 
         if (!res.ok) {
           throw new Error(`データ取得に失敗しました (status: ${res.status})`);
         }
@@ -266,7 +361,6 @@ export default function HeatmapPage() {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-      // バージョンを3.64に固定してHeatmapLayerの完全削除を一時的に回避
       newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
       newScript.async = true;
       newScript.defer = true;
@@ -285,7 +379,7 @@ export default function HeatmapPage() {
       const google = window.google;
 
       const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 34.420, lng: 136.880 }, // 伊勢志摩・鳥羽地域が見やすい初期位置
+        center: { lat: 34.420, lng: 136.880 }, // 伊勢志摩・鳥羽地域
         zoom: 11,
         mapTypeId: 'roadmap',
         styles: [
@@ -296,7 +390,6 @@ export default function HeatmapPage() {
         ],
         disableDefaultUI: true,
       });
-
       mapInstanceRef.current = map; 
 
       const customGradient = [
@@ -304,7 +397,6 @@ export default function HeatmapPage() {
         'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)',
         'rgba(255, 0, 0, 1.0)'
       ];
-
       heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
         data: [],
         map: map,
@@ -313,7 +405,6 @@ export default function HeatmapPage() {
         opacity: 0.85,
         maxIntensity: 25
       });
-
       setMapReady(true);
 
       function getCustomIcon(colorUrl: string): Spot['icon'] {
@@ -326,7 +417,6 @@ export default function HeatmapPage() {
       }
 
       const infoWindow = new google.maps.InfoWindow({ maxWidth: 450 });
-
       const spots: Spot[] = [
         {
           position: { lat: 34.485, lng: 136.842 },
@@ -385,7 +475,7 @@ export default function HeatmapPage() {
     }
   }, []);
 
-  // --- カレンダー生成用ロジック ---
+  // カレンダー関連の計算
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
   const calendarCells = [];
@@ -398,18 +488,14 @@ export default function HeatmapPage() {
 
   const getCalendarDayStatus = (dateNum: number | null) => {
     if (!dateNum) return { isToday: false, isSelected: false };
-    
     const today = new Date();
     const cellDate = new Date(calYear, calMonth, dateNum);
-    
     const isToday = cellDate.getDate() === today.getDate() &&
                     cellDate.getMonth() === today.getMonth() &&
                     cellDate.getFullYear() === today.getFullYear();
-
     const isSelected = cellDate.getDate() === baseDate.getDate() &&
                        cellDate.getMonth() === baseDate.getMonth() &&
                        cellDate.getFullYear() === baseDate.getFullYear();
-
     return { isToday, isSelected };
   };
 
@@ -421,7 +507,6 @@ export default function HeatmapPage() {
 
   const handleJumpToCurrentLocation = () => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -460,6 +545,9 @@ export default function HeatmapPage() {
     }
   };
 
+  // ==========================================
+  // 8. UI レンダリング (JSX)
+  // ==========================================
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
@@ -469,8 +557,8 @@ export default function HeatmapPage() {
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
-          
-          {/* 右上ボタン */}
+   
+          {/* 画面右上ボタン群 */}
           <div className="top-right" style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', gap: '16px', alignItems: 'center', pointerEvents: 'auto' }}>
             <button className="btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#888', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '40px', fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>account_circle</span> ログイン
@@ -625,11 +713,12 @@ export default function HeatmapPage() {
                         
                         let cellBg = 'transparent';
                         let cellTextColor = '#333';
+  
                         if (isSelected) {
                           cellBg = '#ffdd55'; 
                           cellTextColor = 'white'; 
                         } else if (isToday) {
-                          cellBg = '#e8f0fe'; 
+                          cellBg = '#e8f0fe';
                         }
 
                         return (
@@ -663,7 +752,7 @@ export default function HeatmapPage() {
               <input 
                 type="range" 
                 min="0" 
-                max="6"  // 0〜6日目の7段階スライダー
+                max="6" 
                 value={currentProgress}
                 onChange={(e) => {
                   setCurrentProgress(Number(e.target.value));
@@ -691,7 +780,10 @@ export default function HeatmapPage() {
             </div>
           </div>
 
-          {/* 中央のログインモーダル */}
+
+          {/* ========================================== */}
+          {/* 変更：ログインモーダル画面 (API通信版)     */}
+          {/* ========================================== */}
           {showLoginModal && (
             <div 
               onClick={() => setShowLoginModal(false)}
@@ -699,42 +791,84 @@ export default function HeatmapPage() {
                 position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, pointerEvents: 'auto'
               }}
             >
+              {/* モーダル本体: 白ベースのデザイン */}
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{
-                  background: 'white', borderRadius: '32px', padding: '48px', width: '560px', boxShadow: '0 12px 36px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '28px', color: '#333', position: 'relative', boxSizing: 'border-box'
+                  background: '#ffffff', borderRadius: '16px', padding: '40px', width: '480px', boxShadow: '0 12px 36px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '20px', color: '#333', position: 'relative', boxSizing: 'border-box'
                 }}
               >
-                <button onClick={() => setShowLoginModal(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '44px' }}>close</span>
+                {/* 閉じるボタン: 右上に配置し青色系に */}
+                <button onClick={() => setShowLoginModal(false)} style={{ position: 'absolute', top: '-16px', right: '-16px', background: '#0044cc', color: 'white', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>close</span>
                 </button>
-                <h2 style={{ fontSize: '44px', fontWeight: 'bold', textAlign: 'center', margin: '10px 0 0 0', color: '#111' }}>ログイン</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '24px', fontWeight: 'bold', color: '#555' }}>メールアドレス または ID</label>
-                  <input type="text" placeholder="example@email.com" style={{ width: '100%', padding: '18px', borderRadius: '16px', border: '2px solid #ccc', fontSize: '24px', boxSizing: 'border-box', outline: 'none' }} />
+                
+                {/* タイトル */}
+                <h2 style={{ fontSize: '32px', fontWeight: 'normal', margin: '0 0 8px 0', color: '#111' }}>ログイン</h2>
+                
+                {/* メールアドレス入力欄 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '18px', color: '#555' }}>メールアドレス</label>
+                  <input 
+                    type="text" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #ccc', background: '#f5f5f5', fontSize: '18px', boxSizing: 'border-box', outline: 'none' }} 
+                  />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '24px', fontWeight: 'bold', color: '#555' }}>パスワード</label>
-                  <input type="password" placeholder="パスワードを入力" style={{ width: '100%', padding: '18px', borderRadius: '16px', border: '2px solid #ccc', fontSize: '24px', boxSizing: 'border-box', outline: 'none' }} />
+                
+                {/* パスワード入力欄 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '18px', color: '#555' }}>パスワード</label>
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #ccc', background: '#f5f5f5', fontSize: '18px', boxSizing: 'border-box', outline: 'none' }} 
+                  />
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <a href="#forgot" style={{ fontSize: '22px', color: '#0044cc', textDecoration: 'none', fontWeight: '500' }}>ID・パスワードをお忘れの方</a>
-                </div>
-                <button style={{ width: '100%', background: '#0044cc', color: 'white', border: 'none', padding: '20px', borderRadius: '16px', fontSize: '28px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,68,204,0.3)' }}>ログイン</button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '8px 0' }}>
-                  <div style={{ flex: 1, height: '2px', backgroundColor: '#eee' }}></div>
-                  <span style={{ fontSize: '22px', color: '#999' }}>または</span>
-                  <div style={{ flex: 1, height: '2px', backgroundColor: '#eee' }}></div>
-                </div>
-                <button style={{ width: '100%', background: 'white', color: '#333', border: '2px solid #ddd', padding: '18px', borderRadius: '16px', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', boxSizing: 'border-box' }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" style={{ marginRight: '4px' }}>
-                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.315 1.886-2.135 5.542-6.887 5.542-4.09 0-7.43-3.39-7.43-7.57s3.34-7.57 7.43-7.57c2.33 0 3.89 1.01 4.78 1.87l3.24-3.14C18.16 1.57 15.42 1 12.24 1 6.03 1 1 6.03 1 12.24s5.03 11.24 11.24 11.24c6.48 0 10.79-4.56 10.79-10.97 0-.74-.08-1.3-.18-1.77H12.24z"/>
-                  </svg>
-                  Googleでログイン
+                
+                {/* ログインボタン */}
+                <button onClick={handleEmailLogin} style={{ width: '100%', background: '#0044cc', color: 'white', border: 'none', padding: '18px', borderRadius: '30px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginTop: '12px' }}>
+                  ログイン
                 </button>
+                
+                {/* アカウント登録・パスワードリセットのテキストリンク */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '16px', marginTop: '8px' }}>
+                  <div style={{ color: '#333' }}>
+                    アカウントをお持ちではありませんか？ <a href="#register" style={{ color: '#0044cc', textDecoration: 'none', borderBottom: '1px dotted #0044cc', paddingBottom: '2px' }}>今すぐ登録</a>
+                  </div>
+                  <div>
+                    <a href="#forgot" onClick={handlePasswordReset} style={{ color: '#0044cc', textDecoration: 'none', borderBottom: '1px dotted #0044cc', paddingBottom: '2px' }}>パスワードをお忘れですか？</a>
+                  </div>
+                </div>
+
+                {/* 区切り線 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '16px 0' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#ddd' }}></div>
+                  <span style={{ fontSize: '16px', color: '#888' }}>または</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#ddd' }}></div>
+                </div>
+
+                {/* SNSログインボタン群 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <button onClick={handleGoogleLogin} style={{ width: '100%', background: 'white', color: '#333', border: '1px solid #ccc', padding: '16px', borderRadius: '30px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', boxSizing: 'border-box' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.315 1.886-2.135 5.542-6.887 5.542-4.09 0-7.43-3.39-7.43-7.57s3.34-7.57 7.43-7.57c2.33 0 3.89 1.01 4.78 1.87l3.24-3.14C18.16 1.57 15.42 1 12.24 1 6.03 1 1 6.03 1 12.24s5.03 11.24 11.24 11.24c6.48 0 10.79-4.56 10.79-10.97 0-.74-.08-1.3-.18-1.77H12.24z"/>
+                    </svg>
+                    Googleでログイン
+                  </button>
+                  <button onClick={handleAppleLogin} style={{ width: '100%', background: '#000000', color: 'white', border: 'none', padding: '16px', borderRadius: '30px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', boxSizing: 'border-box' }}>
+                    <span style={{ fontSize: '24px', fontWeight: 'normal', fontFamily: 'sans-serif' }}></span>
+                    Appleでログイン
+                  </button>
+                </div>
               </div>
             </div>
           )}
+          {/* ========================================== */}
+
+          {/* ========================================== */}
 
           {/* Windy風 右メニュー */}
           <div 
