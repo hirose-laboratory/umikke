@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
-// Google Mapsの各クラスのインスタンス型を明示的に定義（any完全排除）
 interface GoogleMapInstance {
   getZoom: () => number;
   setZoom: (zoom: number) => void;
@@ -13,7 +12,6 @@ type GoogleHeatmapLayerInstance = {
   setData: (data: object[]) => void;
   setOptions: (options: object) => void;
 };
-
 interface GoogleMarkerInstance {
   addListener: (event: string, handler: () => void) => void;
   setPosition: (latLng: object) => void;
@@ -73,14 +71,13 @@ interface TimelineDay {
   date: Date;
 }
 
-// FastAPI (/ocean/range/) から返ってくる海洋データ1件分の型
 interface OceanDataPoint {
   id: number;
   latitude: number;
   longitude: number;
-  record_timestamp: string; // ISO日時文字列
-  sst: number | null;         // 水温(℃)
-  cha: number | null;         // クロロフィルa濃度
+  record_timestamp: string;
+  sst: number | null;
+  cha: number | null;
   current_speed: number | null;
   current_direction: number | null;
 }
@@ -91,7 +88,6 @@ export default function HeatmapPage() {
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
 
-  // デフォルトの日程を「今日の日付」に設定
   const initDate = useMemo(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -99,36 +95,180 @@ export default function HeatmapPage() {
 
   // --- 状態管理 (State) ---
   const [baseDate, setBaseDate] = useState<Date>(initDate); 
-  const [currentProgress, setCurrentProgress] = useState<number>(0); // 0〜6日目を表す
+  const [currentProgress, setCurrentProgress] = useState<number>(0); 
   const [isPlaying, setIsPlaying] = useState<boolean>(false); 
   
-  // ミニカレンダー用の状態
   const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(false);
   const [calYear, setCalYear] = useState<number>(initDate.getFullYear());
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth()); 
 
-  // 右側サイドパネルの開閉状態
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
 
-  // ログインモーダルの表示・非表示状態
+  // ログインモーダル・メニューの状態
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
-
-  // Windy風右側メニューの開閉状態
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
 
-  // --- 海洋データ(FastAPI)関連の状態 ---
+  // フォーム用State
+  const [username, setUsername] = useState<string>(''); // ★新規追加: ユーザー名
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [isSignUp, setIsSignUp] = useState<boolean>(false); 
+
+  // ログイン状態（Windy風：ログイン後は右メニューにアカウント情報を表示する）
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
+
+  // 海洋データ関連の状態
   const oceanPointsRef = useRef<OceanDataPoint[]>([]);
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
   const [oceanError, setOceanError] = useState<string | null>(null);
-  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0); 
+  const [oceanDataVersion, setOceanDataVersion] = useState<number>(0);
   const [oceanPointCount, setOceanPointCount] = useState<number>(0); 
-  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null); 
+  const [sstRange, setSstRange] = useState<{ min: number; max: number } | null>(null);
   const [mapReady, setMapReady] = useState<boolean>(false); 
 
-  // スライダーの進捗度から、現在選択されている「日」のインデックスを取得
-  const currentDayIndex = currentProgress;
+  // ==========================================
+  // ★ 認証処理系（自前APIによるユーザー登録・ログイン・削除）
+  // ==========================================
+  
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
+  const AUTH_STORAGE_KEY = 'umikke_auth';
 
+  // 1. メールアドレスでのログイン処理（自前API）
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      alert('メールアドレスとパスワードを入力してください。');
+      return;
+    }
+    try {
+      // ★送信先を /users/login に修正
+      const res = await fetch(`${API_BASE_URL}/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        alert('ログインに失敗しました: ' + (errBody?.message || `status ${res.status}`));
+        return;
+      }
+      const data = await res.json();
+      const token = data.token ?? data.access_token ?? '';
+      const loggedEmail = data.email ?? email;
+
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: loggedEmail }));
+      setIsLoggedIn(true);
+      setLoggedInEmail(loggedEmail);
+      setShowLoginModal(false);
+      setShowWindyMenu(true);
+      setPassword('');
+    } catch (err) {
+      console.error(err);
+      alert('ログイン処理中にエラーが発生しました。通信環境をご確認ください。');
+    }
+  };
+
+  // 2. 新規会員登録処理（自前API）
+  const handleRegisterSubmit = async () => {
+    // ★バリデーションに username を追加
+    if (!username || !email || !password) {
+      alert('ユーザー名、メールアドレス、パスワードを入力してください。');
+      return;
+    }
+    if (password.length < 6) {
+      alert('パスワードは6文字以上で設定してください。');
+      return;
+    }
+    try {
+      // ★送信先を FastAPIのルーターに合わせて /users/ に修正
+      const res = await fetch(`${API_BASE_URL}/users/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // ★ペイロードに username を追加
+        body: JSON.stringify({ username, email, password }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        alert('登録に失敗しました: ' + (errBody?.message || `status ${res.status}`));
+        return;
+      }
+      const data = await res.json();
+      const token = data.token ?? data.access_token ?? '';
+      const registeredEmail = data.email ?? email;
+
+      if (token) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: registeredEmail }));
+        setIsLoggedIn(true);
+        setLoggedInEmail(registeredEmail);
+        setShowLoginModal(false);
+        setShowWindyMenu(true);
+      } else {
+        alert('アカウント登録が完了しました！ログインしてください。');
+        setIsSignUp(false);
+      }
+      setPassword('');
+      setUsername(''); // フォームをクリア
+    } catch (err) {
+      console.error(err);
+      alert('登録処理中にエラーが発生しました。通信環境をご確認ください。');
+    }
+  };
+
+  // 3. ログアウト処理
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setIsLoggedIn(false);
+    setLoggedInEmail(null);
+    setShowWindyMenu(false);
+  };
+
+  // 4. アカウント削除処理（自前API）
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('本当にアカウントを削除しますか？この操作は取り消せません。')) return;
+    try {
+      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+      const auth = stored ? JSON.parse(stored) : null;
+      const res = await fetch(`${API_BASE_URL}/users/delete/`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(auth?.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+        },
+        body: JSON.stringify({ email: loggedInEmail }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`));
+        return;
+      }
+      alert('アカウントを削除しました。');
+      handleLogout();
+    } catch (err) {
+      console.error(err);
+      alert('削除処理中にエラーが発生しました。通信環境をご確認ください。');
+    }
+  };
+
+  // 5. ページ読み込み時、保存されたログイン情報を復元
+  useEffect(() => {
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (stored) {
+      try {
+        const auth = JSON.parse(stored);
+        if (auth?.email) {
+          setIsLoggedIn(true);
+          setLoggedInEmail(auth.email);
+        }
+      } catch {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // ==========================================
+
+  const currentDayIndex = currentProgress;
   const timelineDays = useMemo(() => {
     const days: TimelineDay[] = [];
     const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -144,14 +284,12 @@ export default function HeatmapPage() {
     return days; 
   }, [baseDate]);
 
-  // 現在選択されている具体的な日付オブジェクトを計算
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + currentProgress);
     return d;
   }, [baseDate, currentProgress]);
 
-  // 日付表示用の文字列
   const formattedSelectedDate = useMemo(() => {
     const y = selectedFullDate.getFullYear();
     const m = selectedFullDate.getMonth() + 1;
@@ -159,7 +297,6 @@ export default function HeatmapPage() {
     return `${y}年${m}月${d}日`;
   }, [selectedFullDate]);
 
-  // 日単位のアニメーション（1秒ごとに1日進む）
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isPlaying) {
@@ -172,7 +309,6 @@ export default function HeatmapPage() {
     };
   }, [isPlaying]);
 
-  // ヒートマップデータを日付ごとにフィルタリングしてレイヤーに反映する関数
   const updateHeatmapData = useCallback(() => {
     if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
 
@@ -183,7 +319,6 @@ export default function HeatmapPage() {
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
 
-    // 選択された「年月日」に合致するデータのみを抽出（時刻は無視して1日分をマージ）
     const points = allPoints
       .filter((p) => {
         if (p.sst === null || p.sst === undefined) return false;
@@ -212,13 +347,11 @@ export default function HeatmapPage() {
     }
   }, [selectedFullDate]);
 
-  // マップ準備完了、またはデータ更新・スライダー変更のたびにヒートマップを再描画
   useEffect(() => {
     if (!mapReady) return;
     updateHeatmapData();
   }, [mapReady, oceanDataVersion, updateHeatmapData]);
 
-  // 2026年5月の海洋データをFastAPI経由で一括取得（5月全域を対象とする）
   useEffect(() => {
     let cancelled = false;
 
@@ -228,7 +361,6 @@ export default function HeatmapPage() {
       try {
         const start = '2026-05-01T00:00:00';
         const end = '2026-05-31T23:59:59';
-        // FastAPIサーバーのURL（環境に合わせてポート等を適宜調整してください）
         const res = await fetch(
           `http://27.133.132.208:8000/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
@@ -257,7 +389,6 @@ export default function HeatmapPage() {
     };
   }, []);
 
-  // 初回の地図初期化
   useEffect(() => {
     const scriptId = 'google-maps-script';
     const script = document.getElementById(scriptId) as HTMLScriptElement | null;
@@ -266,7 +397,6 @@ export default function HeatmapPage() {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-      // バージョンを3.64に固定してHeatmapLayerの完全削除を一時的に回避
       newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
       newScript.async = true;
       newScript.defer = true;
@@ -285,7 +415,7 @@ export default function HeatmapPage() {
       const google = window.google;
 
       const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 34.420, lng: 136.880 }, // 伊勢志摩・鳥羽地域が見やすい初期位置
+        center: { lat: 34.420, lng: 136.880 }, 
         zoom: 11,
         mapTypeId: 'roadmap',
         styles: [
@@ -296,7 +426,6 @@ export default function HeatmapPage() {
         ],
         disableDefaultUI: true,
       });
-
       mapInstanceRef.current = map; 
 
       const customGradient = [
@@ -304,7 +433,6 @@ export default function HeatmapPage() {
         'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)',
         'rgba(255, 0, 0, 1.0)'
       ];
-
       heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
         data: [],
         map: map,
@@ -313,7 +441,6 @@ export default function HeatmapPage() {
         opacity: 0.85,
         maxIntensity: 25
       });
-
       setMapReady(true);
 
       function getCustomIcon(colorUrl: string): Spot['icon'] {
@@ -326,7 +453,6 @@ export default function HeatmapPage() {
       }
 
       const infoWindow = new google.maps.InfoWindow({ maxWidth: 450 });
-
       const spots: Spot[] = [
         {
           position: { lat: 34.485, lng: 136.842 },
@@ -385,7 +511,6 @@ export default function HeatmapPage() {
     }
   }, []);
 
-  // --- カレンダー生成用ロジック ---
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
   const calendarCells = [];
@@ -398,18 +523,14 @@ export default function HeatmapPage() {
 
   const getCalendarDayStatus = (dateNum: number | null) => {
     if (!dateNum) return { isToday: false, isSelected: false };
-    
     const today = new Date();
     const cellDate = new Date(calYear, calMonth, dateNum);
-    
     const isToday = cellDate.getDate() === today.getDate() &&
                     cellDate.getMonth() === today.getMonth() &&
                     cellDate.getFullYear() === today.getFullYear();
-
     const isSelected = cellDate.getDate() === baseDate.getDate() &&
                        cellDate.getMonth() === baseDate.getMonth() &&
                        cellDate.getFullYear() === baseDate.getFullYear();
-
     return { isToday, isSelected };
   };
 
@@ -421,7 +542,6 @@ export default function HeatmapPage() {
 
   const handleJumpToCurrentLocation = () => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -469,12 +589,19 @@ export default function HeatmapPage() {
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
-          
+        
           {/* 右上ボタン */}
           <div className="top-right" style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', gap: '16px', alignItems: 'center', pointerEvents: 'auto' }}>
-            <button className="btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#888', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '40px', fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>account_circle</span> ログイン
-            </button>
+            {isLoggedIn ? (
+              <button className="btn-account" onClick={() => setShowWindyMenu(true)} style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '40px', fontSize: '26px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', maxWidth: '360px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>account_circle</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loggedInEmail}</span>
+              </button>
+            ) : (
+              <button className="btn-login" onClick={() => { setIsSignUp(false); setShowLoginModal(true); }} style={{ background: '#888', color: 'white', border: 'none', padding: '16px 32px', borderRadius: '40px', fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>account_circle</span> ログイン
+              </button>
+            )}
             <button className="btn-menu" onClick={() => setShowWindyMenu(true)} style={{ background: 'white', border: '1px solid #ccc', borderRadius: '50%', width: '80px', height: '80px', color: '#333', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>menu</span>
             </button>
@@ -629,7 +756,7 @@ export default function HeatmapPage() {
                           cellBg = '#ffdd55'; 
                           cellTextColor = 'white'; 
                         } else if (isToday) {
-                          cellBg = '#e8f0fe'; 
+                          cellBg = '#e8f0fe';
                         }
 
                         return (
@@ -663,7 +790,7 @@ export default function HeatmapPage() {
               <input 
                 type="range" 
                 min="0" 
-                max="6"  // 0〜6日目の7段階スライダー
+                max="6"  
                 value={currentProgress}
                 onChange={(e) => {
                   setCurrentProgress(Number(e.target.value));
@@ -691,7 +818,9 @@ export default function HeatmapPage() {
             </div>
           </div>
 
-          {/* 中央のログインモーダル */}
+          {/* ========================================== */}
+          {/* ログイン＆新規会員登録モーダル（完全修復・高機能版） */}
+          {/* ========================================== */}
           {showLoginModal && (
             <div 
               onClick={() => setShowLoginModal(false)}
@@ -702,39 +831,96 @@ export default function HeatmapPage() {
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{
-                  background: 'white', borderRadius: '32px', padding: '48px', width: '560px', boxShadow: '0 12px 36px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '28px', color: '#333', position: 'relative', boxSizing: 'border-box'
+                  background: '#ffffff', borderRadius: '32px', padding: '72px', width: '820px', minHeight: '760px', maxWidth: '92vw', boxShadow: '0 16px 48px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: '32px', color: '#333', position: 'relative', boxSizing: 'border-box'
                 }}
               >
-                <button onClick={() => setShowLoginModal(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '44px' }}>close</span>
+                {/* 閉じるボタン */}
+                <button onClick={() => setShowLoginModal(false)} style={{ position: 'absolute', top: '-24px', right: '-24px', background: '#0044cc', color: 'white', border: 'none', borderRadius: '50%', width: '64px', height: '64px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>close</span>
                 </button>
-                <h2 style={{ fontSize: '44px', fontWeight: 'bold', textAlign: 'center', margin: '10px 0 0 0', color: '#111' }}>ログイン</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '24px', fontWeight: 'bold', color: '#555' }}>メールアドレス または ID</label>
-                  <input type="text" placeholder="example@email.com" style={{ width: '100%', padding: '18px', borderRadius: '16px', border: '2px solid #ccc', fontSize: '24px', boxSizing: 'border-box', outline: 'none' }} />
+                
+                {/* タイトルの切り替え */}
+                <h2 style={{ fontSize: '50px', fontWeight: 'bold', margin: '0 0 8px 0', color: isSignUp ? '#28a745' : '#111' }}>
+                  {isSignUp ? '【新規会員登録】' : '【ログイン】'}
+                </h2>
+
+                {/* ★新規追加: 新規登録時のみユーザー名入力フィールドを表示 */}
+                {isSignUp && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <label style={{ fontSize: '26px', color: '#555', fontWeight: '500' }}>ユーザー名</label>
+                    <input 
+                      type="text" 
+                      placeholder="ユーザー名を入力"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      style={{ width: '100%', padding: '24px', borderRadius: '18px', border: '2px solid #ddd', background: '#f8f9fa', fontSize: '26px', boxSizing: 'border-box', outline: 'none', transition: 'border 0.2s' }} 
+                    />
+                  </div>
+                )}
+                
+                {/* メールアドレス入力 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <label style={{ fontSize: '26px', color: '#555', fontWeight: '500' }}>メールアドレス</label>
+                  <input 
+                    type="email" 
+                    placeholder="example@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{ width: '100%', padding: '24px', borderRadius: '18px', border: '2px solid #ddd', background: '#f8f9fa', fontSize: '26px', boxSizing: 'border-box', outline: 'none', transition: 'border 0.2s' }} 
+                  />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '24px', fontWeight: 'bold', color: '#555' }}>パスワード</label>
-                  <input type="password" placeholder="パスワードを入力" style={{ width: '100%', padding: '18px', borderRadius: '16px', border: '2px solid #ccc', fontSize: '24px', boxSizing: 'border-box', outline: 'none' }} />
+                
+                {/* パスワード入力 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <label style={{ fontSize: '26px', color: '#555', fontWeight: '500' }}>パスワード</label>
+                  <input 
+                    type="password" 
+                    placeholder="6文字以上のパスワード"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ width: '100%', padding: '24px', borderRadius: '18px', border: '2px solid #ddd', background: '#f8f9fa', fontSize: '26px', boxSizing: 'border-box', outline: 'none', transition: 'border 0.2s' }} 
+                  />
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <a href="#forgot" style={{ fontSize: '22px', color: '#0044cc', textDecoration: 'none', fontWeight: '500' }}>ID・パスワードをお忘れの方</a>
+                
+                {/* メインアクションボタン（ログイン or 登録） */}
+                {isSignUp ? (
+                  <button onClick={handleRegisterSubmit} style={{ width: '100%', background: '#28a745', color: 'white', border: 'none', padding: '28px', borderRadius: '52px', fontSize: '32px', fontWeight: 'bold', cursor: 'pointer', marginTop: '12px', boxShadow: '0 4px 12px rgba(40,167,69,0.3)' }}>
+                    新しくアカウントを作成する
+                  </button>
+                ) : (
+                  <button onClick={handleEmailLogin} style={{ width: '100%', background: '#0044cc', color: 'white', border: 'none', padding: '28px', borderRadius: '52px', fontSize: '32px', fontWeight: 'bold', cursor: 'pointer', marginTop: '12px', boxShadow: '0 4px 12px rgba(0,68,204,0.3)' }}>
+                    ログインする
+                  </button>
+                )}
+                
+                {/* 画面モード切り替え用のUIエリア */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontSize: '26px', marginTop: '8px', borderTop: '1px solid #eee', paddingTop: '24px' }}>
+                  {isSignUp ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                      <span style={{ color: '#666' }}>すでにアカウントをお持ちの方はこちら</span>
+                      <button 
+                        onClick={() => setIsSignUp(false)} 
+                        style={{ background: '#f0f0f0', color: '#333', border: '1px solid #ccc', padding: '12px 32px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        ログイン画面へ戻る
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', width: '100%' }}>
+                      <span style={{ color: '#666' }}>アカウントをお持ちではありませんか？</span>
+                      <button 
+                        onClick={() => setIsSignUp(true)} 
+                        style={{ width: '100%', background: '#28a745', color: 'white', border: 'none', padding: '16px', borderRadius: '32px', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(40,167,69,0.2)' }}
+                      >
+                        今すぐ新規会員登録する
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button style={{ width: '100%', background: '#0044cc', color: 'white', border: 'none', padding: '20px', borderRadius: '16px', fontSize: '28px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,68,204,0.3)' }}>ログイン</button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '8px 0' }}>
-                  <div style={{ flex: 1, height: '2px', backgroundColor: '#eee' }}></div>
-                  <span style={{ fontSize: '22px', color: '#999' }}>または</span>
-                  <div style={{ flex: 1, height: '2px', backgroundColor: '#eee' }}></div>
-                </div>
-                <button style={{ width: '100%', background: 'white', color: '#333', border: '2px solid #ddd', padding: '18px', borderRadius: '16px', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', boxSizing: 'border-box' }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" style={{ marginRight: '4px' }}>
-                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.315 1.886-2.135 5.542-6.887 5.542-4.09 0-7.43-3.39-7.43-7.57s3.34-7.57 7.43-7.57c2.33 0 3.89 1.01 4.78 1.87l3.24-3.14C18.16 1.57 15.42 1 12.24 1 6.03 1 1 6.03 1 12.24s5.03 11.24 11.24 11.24c6.48 0 10.79-4.56 10.79-10.97 0-.74-.08-1.3-.18-1.77H12.24z"/>
-                  </svg>
-                  Googleでログイン
-                </button>
               </div>
             </div>
           )}
+          {/* ========================================== */}
 
           {/* Windy風 右メニュー */}
           <div 
@@ -760,6 +946,30 @@ export default function HeatmapPage() {
             </div>
 
             <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '40px', flexGrow: 1, overflowY: 'auto' }}>
+              {/* Windy風：アカウント情報エリア */}
+              {isLoggedIn ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
+                  <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>ACCOUNT</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#0044cc' }}>account_circle</span>
+                    <span style={{ fontSize: '26px', color: 'white', wordBreak: 'break-all' }}>{loggedInEmail}</span>
+                  </div>
+                  <button onClick={handleLogout} style={{ background: '#444', color: 'white', border: '1px solid #666', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    ログアウト
+                  </button>
+                  <button onClick={handleDeleteAccount} style={{ background: 'transparent', color: '#e57373', border: '1px solid #e57373', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    アカウントを削除
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
+                  <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>ACCOUNT</div>
+                  <button onClick={() => { setShowWindyMenu(false); setIsSignUp(false); setShowLoginModal(true); }} style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    ログイン / 新規登録
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>MAP DISPLAY OPTIONS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
