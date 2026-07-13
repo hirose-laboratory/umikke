@@ -150,7 +150,9 @@ export default function HeatmapPage() {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
-        alert('ログインに失敗しました: ' + (errBody?.message || `status ${res.status}`));
+        // ★ errBody?.detail を追加してFastAPIのエラーを拾うように修正
+        const errorMessage = errBody?.detail || errBody?.message || `status ${res.status}`;
+        alert('ログインに失敗しました: ' + errorMessage);
         return;
       }
       const data = await res.json();
