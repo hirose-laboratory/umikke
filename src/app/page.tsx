@@ -141,7 +141,7 @@ export default function HeatmapPage() {
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/users/login/`, {
+      const res = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -164,7 +164,7 @@ export default function HeatmapPage() {
     if (!email || !password) { alert('登録するメールアドレスとパスワードを入力してください。'); return; }
     if (password.length < 6) { alert('パスワードは6文字以上で設定してください。'); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/users/register/`, {
+      const res = await fetch(`${API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -198,7 +198,7 @@ export default function HeatmapPage() {
     try {
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       const auth = stored ? JSON.parse(stored) : null;
-      const res = await fetch(`${API_BASE_URL}/users/delete/`, {
+      const res = await fetch(`${API_BASE_URL}/users/delete`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
