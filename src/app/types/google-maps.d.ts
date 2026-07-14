@@ -23,6 +23,7 @@ interface GoogleInfoWindowInstance {
 
 interface GoogleSizeInstance {
   width: number;
+  
   height: number;
 }
 
