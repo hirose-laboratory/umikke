@@ -315,9 +315,9 @@ export default function HeatmapPage() {
     async function fetchOceanData() {
       try {
         const start = '2026-05-01T00:00:00'; const end = '2026-05-31T23:59:59';
-        // パラメータを start_time / end_time に修正
+        // ★ 422エラー解消のため、以前動いていた start / end パラメータに戻しました
         const res = await fetch(
-          `${API_BASE_URL}/ocean/range/?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`
+          `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
         if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
         const data: OceanDataPoint[] = await res.json();
@@ -567,13 +567,10 @@ export default function HeatmapPage() {
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
           />
 
-          {/* ★修正: 左下凡例を 15〜25℃の固定値に変更 */}
+          {/* ★修正: 左下凡例 15〜25℃の固定値（20℃表記削除） */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>
-            <div className="slider-bar" style={{ width: '260px', height: '24px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '12px', position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '50%', top: '-28px', transform: 'translateX(-50%)', fontSize: '20px', fontWeight: 'bold' }}>20℃</span>
-              {/* 中央の目印ピン */}
-              <div style={{ position: 'absolute', left: '50%', top: '0', bottom: '0', width: '2px', backgroundColor: 'rgba(255,255,255,0.8)' }}></div>
+            <div className="slider-bar" style={{ width: '260px', height: '24px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '12px' }}>
             </div>
             <span style={{ fontWeight: 'bold' }}>25℃</span>
           </div>
