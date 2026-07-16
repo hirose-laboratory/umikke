@@ -90,6 +90,7 @@ interface Hotpoint {
   score?: number;
   fish_id?: number;
   suggestion?: string;
+  intensity_score?: number;
 }
 
 export default function HeatmapPage() {
@@ -315,7 +316,6 @@ export default function HeatmapPage() {
     async function fetchOceanData() {
       try {
         const start = '2026-05-01T00:00:00'; const end = '2026-05-31T23:59:59';
-        // ★ 422エラー解消のため、以前動いていた start / end パラメータに戻しました
         const res = await fetch(
           `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
@@ -344,7 +344,8 @@ export default function HeatmapPage() {
   useEffect(() => {
     async function fetchHotpoints() {
       try {
-        const res = await fetch(`${API_BASE_URL}/fish/hotpoints/?min_score=0.5&limit=20`);
+        // ★ 修正: エンドポイントを /hotpoints/high-score に変更
+        const res = await fetch(`${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=20`);
         if (res.ok) {
           const data = await res.json();
           setHotpoints(data);
@@ -488,11 +489,12 @@ export default function HeatmapPage() {
 
       marker.addListener('click', () => {
         if (infoWindowRef.current) {
+          const displayScore = hp.intensity_score || hp.score || 'N/A';
           infoWindowRef.current.setContent(`
             <div style="padding: 12px; color: #333; font-size: 16px;">
               <strong style="font-size: 18px; color: #e65100;">漁場サジェストポイント (環境予測ベース)</strong><br/>
               <span style="font-size: 14px; color: #666;">※水温と潮目の環境データから算出</span><br/><br/>
-              スコア: <b>${hp.score?.toFixed(2) || 'N/A'}</b><br/>
+              スコア: <b>${typeof displayScore === 'number' ? displayScore.toFixed(2) : displayScore}</b><br/>
               ${hp.suggestion ? `提案: ${hp.suggestion}` : ''}
             </div>
           `);
@@ -567,7 +569,7 @@ export default function HeatmapPage() {
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
           />
 
-          {/* ★修正: 左下凡例 15〜25℃の固定値（20℃表記削除） */}
+          {/* ★修正: 左下凡例 15〜25℃の固定値。20℃の記述は完全に削除しました */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>
             <div className="slider-bar" style={{ width: '260px', height: '24px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '12px' }}>
