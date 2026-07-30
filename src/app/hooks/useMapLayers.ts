@@ -54,16 +54,25 @@ export function useMapLayers(
       heatmapLayerRef.current.setOptions({ gradient: customGradient, maxIntensity: 10, radius: 45 });
 
       todayPoints.forEach(p => {
-        if (p.current_direction !== null && p.current_speed !== null) {
+        // ① 確実に「数字」として計算できるようにする
+        const speed = Number(p.current_speed ?? 0);
+        const direction = Number(p.current_direction ?? 0);
+
+        // 流速が0より大きい時だけ矢印を描く
+        if (speed > 0) {
           const arrowMarker = new window.google.maps.Marker({
-            position: { lat: p.latitude, lng: p.longitude },
+            position: { lat: Number(p.latitude), lng: Number(p.longitude) },
             map: mapInstance,
             icon: {
               path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: Math.max(2, (p.current_speed??0) * 4), // 流速に応じて矢印の大きさを変える
-              rotation: p.current_direction, // 流向に合わせて回転
-              fillColor: 'white', fillOpacity: 0.9, strokeColor: 'black', strokeWeight: 1
-            }
+              scale: Math.max(5, speed * 15), 
+              rotation: direction, 
+              fillColor: 'white', 
+              fillOpacity: 1.0, 
+              strokeColor: 'black', 
+              strokeWeight: 2 
+            },
+            zIndex: 1000 
           });
           arrowMarkersRef.current.push(arrowMarker);
         }

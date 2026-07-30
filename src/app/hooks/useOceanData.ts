@@ -20,6 +20,7 @@ export function useOceanData(API_BASE_URL: string) {
         const res = await fetch(`${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
         if (!res.ok) throw new Error(`データ取得失敗 (status: ${res.status})`);
         const data: OceanDataPoint[] = await res.json();
+        console.log("🌊 APIから届いた1件目のデータ:", data[0]);//////
         if (cancelled) return;
         oceanPointsRef.current = data;
         setOceanPointCount(data.length);
