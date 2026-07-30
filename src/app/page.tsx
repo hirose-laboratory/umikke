@@ -44,6 +44,7 @@ interface GooglePointInstance {
   y: number;
 }
 
+/*
 declare global {
   interface Window {
     google: {
@@ -65,6 +66,7 @@ declare global {
     };
   }
 }
+*/
 
 interface TimelineDay {
   label: string;
