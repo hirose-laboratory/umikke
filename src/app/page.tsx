@@ -376,7 +376,7 @@ export default function HeatmapPage() {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         
-        // 1. 選択中の魚種IDリスト（型を number[] と明確に指定）
+        // 選択中の魚種IDリスト
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
           if (fishName === 'マダイ') return 1;
           if (fishName === 'ブリ') return 2;
@@ -384,14 +384,17 @@ export default function HeatmapPage() {
           return 0;
         });
 
-        // 2. フィルタリング（.includes ではなく .some を使うことで型エラーを完全回避）
+        // フィルタリング（どちらのカラム名で来てもいいように両対応）
         const targetFishPoints = allFishPoints.filter((p: any) => {
-          // IDを数値化して比較
+          // 魚IDの判定
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           const isFishMatch = selectedFishIds.some(id => id === currentFishId);
 
-          // 日付の比較
-          const pDate = new Date(p?.target_timestamp);
+          // 日時の判定（sample_timestamp または target_timestamp を使用）
+          const timeString = p?.sample_timestamp ?? p?.target_timestamp;
+          if (!timeString) return false;
+
+          const pDate = new Date(timeString);
           const isDateMatch = 
             pDate.getFullYear() === targetYear &&
             pDate.getMonth() === targetMonth &&
@@ -400,14 +403,17 @@ export default function HeatmapPage() {
           return isFishMatch && isDateMatch;
         });
 
-        // 描画データを作成（Numberで型を確実にして重みも計算）
-        const fishHeatData = targetFishPoints.map((p: any) => ({
-          location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-          weight: Math.max(1, (Number((p as any).heatmap_value) || 1) * 10),
-        }));
+        // 描画データを作成（concentration または heatmap_value を使用）
+        const fishHeatData = targetFishPoints.map((p: any) => {
+          const rawVal = Number(p?.concentration ?? p?.heatmap_value ?? 1);
+          return {
+            location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
+            // concentration の数値（300〜1200程度）に合わせて適切に重み付け
+            weight: Math.max(1, rawVal),
+          };
+        });
 
-        // ブラウザのF12コンソールに件数を表示（デバッグ用）
-        console.log('★ヒートマップに渡すデータ件数:', fishHeatData.length);
+        console.log('★表示対象のデータ件数:', fishHeatData.length);
 
         const fishGradient = [
           'rgba(142, 36, 170, 0)',   // 透明な紫
@@ -420,7 +426,7 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
           radius: 40,
-          maxIntensity: 10
+          maxIntensity: 1000 // concentrationの数値規模（~1200）に合わせて調整
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
