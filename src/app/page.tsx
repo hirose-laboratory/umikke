@@ -376,28 +376,38 @@ export default function HeatmapPage() {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         
-        const selectedFishIds = activeFishLayers.map(fishName => {
+        // 1. 選択中の魚種IDリスト（型を number[] と明確に指定）
+        const selectedFishIds: number[] = activeFishLayers.map(fishName => {
           if (fishName === 'マダイ') return 1;
           if (fishName === 'ブリ') return 2;
           if (fishName === '伊勢エビ') return 3;
           return 0;
         });
 
-        // 型を (p: FishPredictionPoint) で明示してエラー回避
-        const targetFishPoints = allFishPoints.filter((p: FishPredictionPoint) => {
-          const pDate = new Date(p.target_timestamp);
-          return (
+        // 2. フィルタリング（.includes ではなく .some を使うことで型エラーを完全回避）
+        const targetFishPoints = allFishPoints.filter((p: any) => {
+          // IDを数値化して比較
+          const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+          const isFishMatch = selectedFishIds.some(id => id === currentFishId);
+
+          // 日付の比較
+          const pDate = new Date(p?.target_timestamp);
+          const isDateMatch = 
             pDate.getFullYear() === targetYear &&
             pDate.getMonth() === targetMonth &&
-            pDate.getDate() === targetDateNum &&
-            selectedFishIds.includes((p as any).fish_id)
-          );
+            pDate.getDate() === targetDateNum;
+
+          return isFishMatch && isDateMatch;
         });
 
-        const fishHeatData = targetFishPoints.map((p: FishPredictionPoint) => ({
-          location: new google.maps.LatLng(p.latitude, p.longitude),
-          weight: p.heatmap_value * 10,
+        // 描画データを作成（Numberで型を確実にして重みも計算）
+        const fishHeatData = targetFishPoints.map((p: any) => ({
+          location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
+          weight: Math.max(1, (Number((p as any).heatmap_value) || 1) * 10),
         }));
+
+        // ブラウザのF12コンソールに件数を表示（デバッグ用）
+        console.log('★ヒートマップに渡すデータ件数:', fishHeatData.length);
 
         const fishGradient = [
           'rgba(142, 36, 170, 0)',   // 透明な紫
