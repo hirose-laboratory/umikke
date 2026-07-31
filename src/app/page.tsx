@@ -478,12 +478,18 @@ export default function HeatmapPage() {
   useEffect(() => {
     async function fetchFishPredictionData() {
       try {
-        const res = await fetch(`${API_BASE_URL}/edna_prediction`); 
-        if (res.ok) {
-          const data = await res.json();
-          fishPointsRef.current = data;
-          setOceanDataVersion((v) => v + 1);
+        // ★ エンドポイントを /edna に変更（バックエンドの設定に合わせて調整してください）
+        const res = await fetch(`${API_BASE_URL}/edna`); 
+        
+        if (!res.ok) {
+          console.error(`eDNAデータ取得エラー: Status ${res.status}`);
+          return;
         }
+
+        const data = await res.json();
+        console.log('★取得したeDNAデータ:', data); // 取得成功の確認用
+        fishPointsRef.current = data;
+        setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('魚種予測データの取得に失敗しました:', err);
       }
