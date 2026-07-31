@@ -6,8 +6,9 @@ interface RightSidebarProps {
   setShowMarinePanel: (show: boolean) => void;
   showFishPanel: boolean;
   setShowFishPanel: (show: boolean) => void;
-  activeMarineLayer: string;
-  setActiveMarineLayer: (layer: string) => void;
+  // ★ 単数形から、複数形（配列）に戻しました！
+  activeMarineLayers: string[];
+  setActiveMarineLayers: (layers: string[]) => void;
   showEdnaPanel: boolean;
   setShowEdnaPanel: (show: boolean) => void;
   showEdnaHeatmap: boolean;
@@ -19,26 +20,29 @@ export default function RightSidebar({
   setShowMarinePanel,
   showFishPanel,
   setShowFishPanel,
-  activeMarineLayer,
-  setActiveMarineLayer,
+  activeMarineLayers, // ★ 複数形
+  setActiveMarineLayers, // ★ 複数形
   showEdnaPanel,
   setShowEdnaPanel,
   showEdnaHeatmap,
   setShowEdnaHeatmap,
 }: RightSidebarProps) {
+
+  // ★ チェックボックスをON/OFFした時の処理
+  const toggleMarineLayer = (layer: string) => {
+    if (activeMarineLayers.includes(layer)) {
+      setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer)); // 外す
+    } else {
+      setActiveMarineLayers([...activeMarineLayers, layer]); // 追加する
+    }
+  };
   
   return (
-    <div
-      className="right-sidebar"
-      style={{ position: 'absolute', top: '140px', right: '30px', display: 'flex', flexDirection: 'column', gap: '24px', pointerEvents: 'auto' }}
-    >
+    <div className="right-sidebar" style={{ position: 'absolute', top: '140px', right: '30px', display: 'flex', flexDirection: 'column', gap: '24px', pointerEvents: 'auto' }}>
+      
       {/* 1. 海況状況 */}
       <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div
-          className="layer-btn"
-          onClick={() => setShowMarinePanel(!showMarinePanel)}
-          style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}
-        >
+        <div className="layer-btn" onClick={() => setShowMarinePanel(!showMarinePanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div className="layer-color blue" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#1a237e' }}></div>
             <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -46,21 +50,20 @@ export default function RightSidebar({
               <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>海況データ</span>
             </div>
           </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>
-            {showMarinePanel ? 'expand_more' : 'expand_less'}
-          </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showMarinePanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
+        {/* ★ チェックボックスに変更！ */}
         {showMarinePanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'sst'} onChange={() => setActiveMarineLayer('sst')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 水温
+              <input type="checkbox" checked={activeMarineLayers.includes('sst')} onChange={() => toggleMarineLayer('sst')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 水温
             </label>
             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'chl'} onChange={() => setActiveMarineLayer('chl')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> クロロフィルa濃度
+              <input type="checkbox" checked={activeMarineLayers.includes('chl')} onChange={() => toggleMarineLayer('chl')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> クロロフィルa濃度
             </label>
             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'current'} onChange={() => setActiveMarineLayer('current')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 流向・流速
+              <input type="checkbox" checked={activeMarineLayers.includes('current')} onChange={() => toggleMarineLayer('current')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 流向・流速
             </label>
           </div>
         )}
@@ -68,11 +71,7 @@ export default function RightSidebar({
 
       {/* 2. 魚種分布 */}
       <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div
-          className="layer-btn"
-          onClick={() => setShowFishPanel(!showFishPanel)}
-          style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}
-        >
+        <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div className="layer-color purple" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#8e24aa' }}></div>
             <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -80,9 +79,7 @@ export default function RightSidebar({
               <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>魚種カテゴリ別表示</span>
             </div>
           </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>
-            {showFishPanel ? 'expand_more' : 'expand_less'}
-          </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showFishPanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
         {showFishPanel && (
@@ -98,11 +95,7 @@ export default function RightSidebar({
 
       {/* 3. 環境DNA (eDNA) */}
       <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div
-          className="layer-btn"
-          onClick={() => setShowEdnaPanel(!showEdnaPanel)}
-          style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}
-        >
+        <div className="layer-btn" onClick={() => setShowEdnaPanel(!showEdnaPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <div className="layer-color green" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#2e7d32' }}></div>
             <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -110,9 +103,7 @@ export default function RightSidebar({
               <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>eDNAヒートマップ</span>
             </div>
           </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>
-            {showEdnaPanel ? 'expand_more' : 'expand_less'}
-          </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showEdnaPanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
         {showEdnaPanel && (
@@ -123,7 +114,6 @@ export default function RightSidebar({
           </div>
         )}
       </div>
-
     </div>
   );
 }

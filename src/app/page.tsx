@@ -119,7 +119,7 @@ export default function HeatmapPage() {
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [showEdnaPanel, setShowEdnaPanel] = useState<boolean>(true);
   const [showEdnaHeatmap, setShowEdnaHeatmap] = useState<boolean>(false);
-  const [activeMarineLayer, setActiveMarineLayer] = useState<string>('sst');
+  const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -283,49 +283,94 @@ export default function HeatmapPage() {
   }, [isPlaying]);
 
   // ==========================================
-  // ★ 水温ヒートマップと流速矢印を描画する処理（ラジオボタン連動）
+  // ★ ヒートマップ（水温・クロロフィル）と流速矢印の描画処理
   // ==========================================
   const updateMapLayers = useCallback(() => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
     const google = window.google;
     const allPoints = oceanPointsRef.current;
+    
+    // 日付フィルター（デバッグ時は外してもOK）
     const targetYear = selectedFullDate.getFullYear();
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
-
-    // その日のデータだけ抽出
     const todayPoints = allPoints.filter((p) => {
       const pDate = new Date(p.record_timestamp);
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
-    // 1. 水温（ヒートマップ）の更新
+    // --- 1. ヒートマップ（水温・クロロフィル）の更新 ---
     if (heatmapLayerRef.current) {
-      if (activeMarineLayer === 'sst') {
-        const heatPoints = todayPoints.filter(p => p.sst !== null && p.sst !== undefined).map((p) => {
-          const weightValue = Math.max(0, (p.sst as number) - 15);
+      const hasSst = activeMarineLayers.includes('sst');
+      const hasChl = activeMarineLayers.includes('chl');
+
+      if (hasSst || hasChl) {
+        // 重み（値の強さ）を計算する
+        const heatPoints = todayPoints.map((p) => {
+          let weightValue = 0;
+          
+          // ★ データベースのクロロフィルの値が 'chl' だと仮定しています。もし違う名前なら書き換えてください。
+          const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
+          const chlVal = Number((p as any).chl ?? 0) * 10; // クロロフィルは値が小さいことが多いので10倍して目立たせる
+
+          if (hasSst && hasChl) {
+            // 両方オン：2つの値を足し合わせて、相乗効果を出す！
+            weightValue = sstVal + chlVal;
+          } else if (hasSst) {
+            weightValue = sstVal;
+          } else if (hasChl) {
+            weightValue = chlVal;
+          }
+
           return {
             location: new google.maps.LatLng(p.latitude, p.longitude),
             weight: weightValue,
           };
         });
+
+        // グラデーション（色）の切り替え
+        let gradient = null;
+        if (hasSst && hasChl) {
+          // ★ 両方オンの時：怪しくもカッコいい「紫〜マゼンタ」のグラデーション！
+          gradient = [
+            'rgba(255, 0, 255, 0)',
+            'rgba(128, 0, 128, 1)',
+            'rgba(255, 0, 255, 1)',
+            'rgba(255, 0, 0, 1)'
+          ];
+        } else if (hasChl) {
+          // ★ クロロフィルのみ：植物プランクトンをイメージした「緑」のグラデーション！
+          gradient = [
+            'rgba(0, 255, 0, 0)',
+            'rgba(0, 255, 0, 1)',
+            'rgba(173, 255, 47, 1)',
+            'rgba(255, 255, 0, 1)'
+          ];
+        } else {
+          // 水温のみ：デフォルトの色（赤系）にするため null を設定
+          gradient = null; 
+        }
+
         heatmapLayerRef.current.setData(heatPoints);
-        heatmapLayerRef.current.setOptions({ maxIntensity: 10, radius: 45 });
+        heatmapLayerRef.current.setOptions({ 
+          maxIntensity: 10, 
+          radius: 45,
+          gradient: gradient // ★ ここで色を適用！
+        });
       } else {
-        // 水温以外のボタンが押されている時はヒートマップを消す
+        // どちらも選ばれていない時はヒートマップを消す
         heatmapLayerRef.current.setData([]);
       }
     }
 
-    // 2. 流向・流速（矢印）の更新
+    // --- 2. 流向・流速（矢印）の更新 ---
     arrowMarkersRef.current.forEach(marker => marker.setMap(null));
     arrowMarkersRef.current = [];
 
-    if (activeMarineLayer === 'current') {
+    // 'current' が配列に含まれている時だけ矢印を描画！
+    if (activeMarineLayers.includes('current')) {
       todayPoints.forEach(p => {
-        // ★データベースに current_speed や current_direction が無くても表示されるよう、一旦固定値を入れています。
-        // もしデータベースの実際の値を使いたい場合は (p.current_speed ?? 0) のように戻してください。
-        const speed = Number(p.current_speed ?? 1.5); 
+        const speed = Number(p.current_speed ?? 0); 
         const direction = Number(p.current_direction ?? 0);
 
         if (speed > 0) {
@@ -334,12 +379,12 @@ export default function HeatmapPage() {
             map: mapInstanceRef.current,
             icon: {
               path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: 7, 
+              scale: Math.max(3, speed * 5), // スピードで大きさが変わる
               rotation: direction,
-              fillColor: '#ffa500', // 赤色で目立たせる
-              fillOpacity: 1.0,
+              fillColor: '#FF0000',
+              fillOpacity: 0.9,
               strokeColor: 'white',
-              strokeWeight: 3 // 枠線も太く
+              strokeWeight: 1
             },
             zIndex: 1000
           });
@@ -347,7 +392,7 @@ export default function HeatmapPage() {
         }
       });
     }
-  }, [selectedFullDate, activeMarineLayer]); // ★ activeMarineLayer の変更を監視
+  }, [selectedFullDate, activeMarineLayers]); // ★ 配列の変更を監視
   useEffect(() => {
     if (!mapReady) return; updateMapLayers();
   }, [mapReady, oceanDataVersion, updateMapLayers]);
@@ -616,7 +661,7 @@ export default function HeatmapPage() {
           <RightSidebar
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
-            activeMarineLayer={activeMarineLayer} setActiveMarineLayer={setActiveMarineLayer}
+            activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
             showEdnaPanel={showEdnaPanel} setShowEdnaPanel={setShowEdnaPanel}
             showEdnaHeatmap={showEdnaHeatmap} setShowEdnaHeatmap={setShowEdnaHeatmap}
           />
