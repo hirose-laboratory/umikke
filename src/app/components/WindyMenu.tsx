@@ -60,17 +60,7 @@ export default function WindyMenu({
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>MAP DISPLAY OPTIONS</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <span style={{ fontSize: '26px', color: '#ccc' }}>ベース地図のタイプ</span>
-              <select style={{ width: '100%', background: '#333', color: 'white', border: '1px solid #444', padding: '16px', borderRadius: '12px', fontSize: '24px', outline: 'none' }}>
-                <option>標準マップ</option>
-                <option>衛星写真マップ</option>
-                <option>地形・白地図</option>
-              </select>
-            </div>
-          </div>
+          
         </div>
       </div>
     </>
