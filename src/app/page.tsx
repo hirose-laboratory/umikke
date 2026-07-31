@@ -332,9 +332,9 @@ export default function HeatmapPage() {
             map: mapInstanceRef.current,
             icon: {
               path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: 5, 
+              scale: 7, 
               rotation: direction,
-              fillColor: '#FF0000', // 赤色で目立たせる
+              fillColor: '#ffa500', // 赤色で目立たせる
               fillOpacity: 1.0,
               strokeColor: 'white',
               strokeWeight: 3 // 枠線も太く
@@ -586,7 +586,7 @@ export default function HeatmapPage() {
               position: currentLatLng,
               map: mapInstanceRef.current,
               title: '現在地',
-              icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#0044cc', fillOpacity: 1.0, strokeColor: 'white', strokeWeight: 3, scale: 10 },
+              icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#0044cc', fillOpacity: 1.0, strokeColor: 'white', strokeWeight: 3, scale: 4 },
             });
           }
         },
