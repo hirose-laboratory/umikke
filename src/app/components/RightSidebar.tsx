@@ -8,6 +8,9 @@ interface RightSidebarProps {
   setShowFishPanel: (show: boolean) => void;
   activeMarineLayers: string[];
   setActiveMarineLayers: (layers: string[]) => void;
+  // ★ 追加：魚種用の配列
+  activeFishLayers: string[];
+  setActiveFishLayers: (layers: string[]) => void;
 }
 
 export default function RightSidebar({
@@ -17,13 +20,25 @@ export default function RightSidebar({
   setShowFishPanel,
   activeMarineLayers,
   setActiveMarineLayers,
+  activeFishLayers,
+  setActiveFishLayers,
 }: RightSidebarProps) {
 
+  // 海況データの切り替え
   const toggleMarineLayer = (layer: string) => {
     if (activeMarineLayers.includes(layer)) {
       setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer));
     } else {
       setActiveMarineLayers([...activeMarineLayers, layer]);
+    }
+  };
+
+  // ★ 魚種の切り替えロジックを追加
+  const toggleFishLayer = (fish: string) => {
+    if (activeFishLayers.includes(fish)) {
+      setActiveFishLayers(activeFishLayers.filter(f => f !== fish));
+    } else {
+      setActiveFishLayers([...activeFishLayers, fish]);
     }
   };
   
@@ -71,12 +86,12 @@ export default function RightSidebar({
           <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showFishPanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
-        {/* ★ ここをマダイ・ブリ・伊勢エビに変更しました！ */}
+        {/* ★ 連動するように書き換えました！ */}
         {showFishPanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {['マダイ', 'ブリ', '伊勢エビ'].map((fish) => (
               <label key={fish} className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-                <input type="checkbox" style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#8e24aa' }} /> {fish}
+                <input type="checkbox" checked={activeFishLayers.includes(fish)} onChange={() => toggleFishLayer(fish)} style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#8e24aa' }} /> {fish}
               </label>
             ))}
           </div>

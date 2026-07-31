@@ -44,30 +44,6 @@ interface GooglePointInstance {
   y: number;
 }
 
-/*
-declare global {
-  interface Window {
-    google: {
-      maps: {
-        Map: new (el: HTMLElement, options: object) => GoogleMapInstance;
-        LatLng: new (lat: number, lng: number) => GoogleLatLngInstance;
-        Marker: new (options: object) => GoogleMarkerInstance;
-        InfoWindow: new (options: object) => GoogleInfoWindowInstance;
-        event: {
-          removeListener: (listener: object) => void;
-        };
-        SymbolPath: {
-          CIRCLE: number;
-        };
-        visualization: {
-          HeatmapLayer: new (options: object) => GoogleHeatmapLayerInstance;
-        };
-      };
-    };
-  }
-}
-*/
-
 interface TimelineDay {
   label: string;
   date: Date;
@@ -82,6 +58,16 @@ interface OceanDataPoint {
   cha: number | null;
   current_speed: number | null;
   current_direction: number | null;
+}
+
+// ★ 魚種予測データ（eDNA_Prediction）の型
+interface FishPredictionPoint {
+  id: number;
+  fish_id: number;
+  latitude: number;
+  longitude: number;
+  target_timestamp: string;
+  heatmap_value: number;
 }
 
 // 漁場サジェスト・ホットポイント用
@@ -100,6 +86,11 @@ export default function HeatmapPage() {
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
+  
+  // ★ 魚種用のRefを追加
+  const fishPointsRef = useRef<FishPredictionPoint[]>([]);
+  const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
+  
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
   const hotpointMarkersRef = useRef<GoogleMarkerInstance[]>([]);
 
@@ -118,6 +109,7 @@ export default function HeatmapPage() {
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
+  const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -149,7 +141,6 @@ export default function HeatmapPage() {
     const d = new Date(baseDate); d.setDate(d.getDate() + currentProgress); return d;
   }, [baseDate, currentProgress]);
   
-  // マップクリックイベント等で最新の日付を参照するためのRef
   const selectedFullDateRef = useRef(selectedFullDate);
   useEffect(() => {
     selectedFullDateRef.current = selectedFullDate;
@@ -159,7 +150,7 @@ export default function HeatmapPage() {
   const AUTH_STORAGE_KEY = 'umikke_auth';
 
   // ==========================================
-  // ★ 認証処理系
+  // 認証処理系
   // ==========================================
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
@@ -281,14 +272,13 @@ export default function HeatmapPage() {
   }, [isPlaying]);
 
   // ==========================================
-  // ★ ヒートマップ（水温・クロロフィル）と流速矢印の描画処理
+  // ★ マップレイヤー描画処理
   // ==========================================
   const updateMapLayers = useCallback(() => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
     const google = window.google;
     const allPoints = oceanPointsRef.current;
     
-    // 日付フィルター（デバッグ時は外してもOK）
     const targetYear = selectedFullDate.getFullYear();
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
@@ -297,22 +287,18 @@ export default function HeatmapPage() {
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
-    // --- 1. ヒートマップ（水温・クロロフィル）の更新 ---
+    // --- 1. 海況ヒートマップ（水温・クロロフィル） ---
     if (heatmapLayerRef.current) {
       const hasSst = activeMarineLayers.includes('sst');
       const hasChl = activeMarineLayers.includes('chl');
 
       if (hasSst || hasChl) {
-        // 重み（値の強さ）を計算する
         const heatPoints = todayPoints.map((p) => {
           let weightValue = 0;
-          
-          // ★ データベースのクロロフィルの値が 'chl' だと仮定しています。もし違う名前なら書き換えてください。
           const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
-          const chlVal = Number((p as any).chl ?? 0) * 10; // クロロフィルは値が小さいことが多いので10倍して目立たせる
+          const chlVal = Number((p as any).chl ?? 0) * 10;
 
           if (hasSst && hasChl) {
-            // 両方オン：2つの値を足し合わせて、相乗効果を出す！
             weightValue = sstVal + chlVal;
           } else if (hasSst) {
             weightValue = sstVal;
@@ -326,10 +312,8 @@ export default function HeatmapPage() {
           };
         });
 
-        // グラデーション（色）の切り替え
         let gradient = null;
         if (hasSst && hasChl) {
-          // ★ 両方オンの時：怪しくもカッコいい「紫〜マゼンタ」のグラデーション！
           gradient = [
             'rgba(255, 0, 255, 0)',
             'rgba(128, 0, 128, 1)',
@@ -337,7 +321,6 @@ export default function HeatmapPage() {
             'rgba(255, 0, 0, 1)'
           ];
         } else if (hasChl) {
-          // ★ クロロフィルのみ：植物プランクトンをイメージした「緑」のグラデーション！
           gradient = [
             'rgba(0, 255, 0, 0)',
             'rgba(0, 255, 0, 1)',
@@ -345,7 +328,6 @@ export default function HeatmapPage() {
             'rgba(255, 255, 0, 1)'
           ];
         } else {
-          // 水温のみ：デフォルトの色（赤系）にするため null を設定
           gradient = null; 
         }
 
@@ -353,19 +335,17 @@ export default function HeatmapPage() {
         heatmapLayerRef.current.setOptions({ 
           maxIntensity: 10, 
           radius: 45,
-          gradient: gradient // ★ ここで色を適用！
+          gradient: gradient
         });
       } else {
-        // どちらも選ばれていない時はヒートマップを消す
         heatmapLayerRef.current.setData([]);
       }
     }
 
-    // --- 2. 流向・流速（矢印）の更新 ---
+    // --- 2. 流向・流速（矢印） ---
     arrowMarkersRef.current.forEach(marker => marker.setMap(null));
     arrowMarkersRef.current = [];
 
-    // 'current' が配列に含まれている時だけ矢印を描画！
     if (activeMarineLayers.includes('current')) {
       todayPoints.forEach(p => {
         const speed = Number(p.current_speed ?? 0); 
@@ -377,7 +357,7 @@ export default function HeatmapPage() {
             map: mapInstanceRef.current,
             icon: {
               path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: Math.max(3, speed * 5), // スピードで大きさが変わる
+              scale: Math.max(3, speed * 5),
               rotation: direction,
               fillColor: '#FF0000',
               fillOpacity: 0.9,
@@ -390,14 +370,61 @@ export default function HeatmapPage() {
         }
       });
     }
-  }, [selectedFullDate, activeMarineLayers]); // ★ 配列の変更を監視
+
+    // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
+    if (fishHeatmapLayerRef.current) {
+      if (activeFishLayers.length > 0) {
+        const allFishPoints = fishPointsRef.current;
+        
+        const selectedFishIds = activeFishLayers.map(fishName => {
+          if (fishName === 'マダイ') return 1;
+          if (fishName === 'ブリ') return 2;
+          if (fishName === '伊勢エビ') return 3;
+          return 0;
+        });
+
+        // 型を (p: FishPredictionPoint) で明示してエラー回避
+        const targetFishPoints = allFishPoints.filter((p: FishPredictionPoint) => {
+          const pDate = new Date(p.target_timestamp);
+          return (
+            pDate.getFullYear() === targetYear &&
+            pDate.getMonth() === targetMonth &&
+            pDate.getDate() === targetDateNum &&
+            selectedFishIds.includes((p as any).fish_id)
+          );
+        });
+
+        const fishHeatData = targetFishPoints.map((p: FishPredictionPoint) => ({
+          location: new google.maps.LatLng(p.latitude, p.longitude),
+          weight: p.heatmap_value * 10,
+        }));
+
+        const fishGradient = [
+          'rgba(142, 36, 170, 0)',   // 透明な紫
+          'rgba(142, 36, 170, 1)',   // 紫
+          'rgba(255, 152, 0, 1)',    // オレンジ
+          'rgba(255, 235, 59, 1)'    // 黄色
+        ];
+
+        fishHeatmapLayerRef.current.setData(fishHeatData);
+        fishHeatmapLayerRef.current.setOptions({
+          gradient: fishGradient,
+          radius: 40,
+          maxIntensity: 10
+        });
+      } else {
+        fishHeatmapLayerRef.current.setData([]);
+      }
+    }
+  }, [selectedFullDate, activeMarineLayers, activeFishLayers]);
+  
   useEffect(() => {
     if (!mapReady) return; updateMapLayers();
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
 
   // ==========================================
-  // APIデータ取得系（海洋データ ＆ 漁場サジェスト）
+  // APIデータ取得系
   // ==========================================
   const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
 
@@ -431,11 +458,27 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL]);
 
-  // 2. 漁場サジェスト（Hotpoints）の取得
+  // 2. 魚種予測データの取得
+  useEffect(() => {
+    async function fetchFishPredictionData() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/edna_prediction`); 
+        if (res.ok) {
+          const data = await res.json();
+          fishPointsRef.current = data;
+          setOceanDataVersion((v) => v + 1);
+        }
+      } catch (err) {
+        console.error('魚種予測データの取得に失敗しました:', err);
+      }
+    }
+    fetchFishPredictionData();
+  }, [API_BASE_URL]);
+
+  // 3. 漁場サジェスト（Hotpoints）の取得
   useEffect(() => {
     async function fetchHotpoints() {
       try {
-        // ★ 修正: エンドポイントを /hotpoints/high-score に変更
         const res = await fetch(`${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=20`);
         if (res.ok) {
           const data = await res.json();
@@ -493,15 +536,18 @@ export default function HeatmapPage() {
       });
       mapInstanceRef.current = map;
 
-      // 15℃(透明)〜25℃(赤)までのグラデーション
       const customGradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
       heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
         data: [], map: map, gradient: customGradient, radius: 15, opacity: 0.85
       });
+
+      // ★ 魚種用ヒートマップレイヤー初期化
+      fishHeatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
+        data: [], map: map, radius: 40, opacity: 0.85
+      });
       
       infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
-      // ★ マップタップ時のイベント：一番近い海洋データを表示
       map.addListener('click', (e: any) => {
         const clickLat = e.latLng.lat();
         const clickLng = e.latLng.lng();
@@ -511,7 +557,6 @@ export default function HeatmapPage() {
         const targetMonth = targetDate.getMonth();
         const targetDateNum = targetDate.getDate();
 
-        // 表示中の日のデータをフィルタリング
         const todayPoints = oceanPointsRef.current.filter((p) => {
           if (p.sst === null || p.sst === undefined) return false;
           const pDate = new Date(p.record_timestamp);
@@ -520,7 +565,6 @@ export default function HeatmapPage() {
 
         if (todayPoints.length === 0) return;
 
-        // タップした場所に一番近いポイントを算出
         let nearestPoint = todayPoints[0];
         let minDistance = Number.MAX_VALUE;
         for (const p of todayPoints) {
@@ -531,7 +575,6 @@ export default function HeatmapPage() {
           }
         }
 
-        // 近すぎる場所がない場合は表示しない（大体5~10km圏内を閾値に）
         if (minDistance > 0.05) return;
 
         const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -553,13 +596,11 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // 取得したサジェスト(Hotpoints)をマップにマーカーとして配置
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
     const google = window.google;
 
-    // 古いマーカーをクリア
     hotpointMarkersRef.current.forEach(m => m.setMap(null));
     hotpointMarkersRef.current = [];
 
@@ -660,9 +701,9 @@ export default function HeatmapPage() {
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
+            activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
           />
-          
-          {/* ★修正: 左下凡例 15〜25℃の固定値。20℃の記述は完全に削除しました */}
+
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>
             <div className="slider-bar" style={{ width: '260px', height: '24px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '12px' }}>
@@ -715,4 +756,4 @@ export default function HeatmapPage() {
       </div>
     </>
   );
-  }
+}
