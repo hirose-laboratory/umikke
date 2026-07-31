@@ -332,7 +332,7 @@ export default function HeatmapPage() {
             map: mapInstanceRef.current,
             icon: {
               path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: 25, // ★★★ ここを 25 というバカでかいサイズに設定！ ★★★
+              scale: 5, 
               rotation: direction,
               fillColor: '#FF0000', // 赤色で目立たせる
               fillOpacity: 1.0,
