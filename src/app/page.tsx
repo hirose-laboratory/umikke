@@ -117,8 +117,6 @@ export default function HeatmapPage() {
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth());
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
-  const [showEdnaPanel, setShowEdnaPanel] = useState<boolean>(true);
-  const [showEdnaHeatmap, setShowEdnaHeatmap] = useState<boolean>(false);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -662,9 +660,8 @@ export default function HeatmapPage() {
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
-            showEdnaPanel={showEdnaPanel} setShowEdnaPanel={setShowEdnaPanel}
-            showEdnaHeatmap={showEdnaHeatmap} setShowEdnaHeatmap={setShowEdnaHeatmap}
           />
+          
           {/* ★修正: 左下凡例 15〜25℃の固定値。20℃の記述は完全に削除しました */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>

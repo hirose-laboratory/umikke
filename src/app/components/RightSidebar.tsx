@@ -6,13 +6,8 @@ interface RightSidebarProps {
   setShowMarinePanel: (show: boolean) => void;
   showFishPanel: boolean;
   setShowFishPanel: (show: boolean) => void;
-  // ★ 単数形から、複数形（配列）に戻しました！
   activeMarineLayers: string[];
   setActiveMarineLayers: (layers: string[]) => void;
-  showEdnaPanel: boolean;
-  setShowEdnaPanel: (show: boolean) => void;
-  showEdnaHeatmap: boolean;
-  setShowEdnaHeatmap: (show: boolean) => void;
 }
 
 export default function RightSidebar({
@@ -20,20 +15,15 @@ export default function RightSidebar({
   setShowMarinePanel,
   showFishPanel,
   setShowFishPanel,
-  activeMarineLayers, // ★ 複数形
-  setActiveMarineLayers, // ★ 複数形
-  showEdnaPanel,
-  setShowEdnaPanel,
-  showEdnaHeatmap,
-  setShowEdnaHeatmap,
+  activeMarineLayers,
+  setActiveMarineLayers,
 }: RightSidebarProps) {
 
-  // ★ チェックボックスをON/OFFした時の処理
   const toggleMarineLayer = (layer: string) => {
     if (activeMarineLayers.includes(layer)) {
-      setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer)); // 外す
+      setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer));
     } else {
-      setActiveMarineLayers([...activeMarineLayers, layer]); // 追加する
+      setActiveMarineLayers([...activeMarineLayers, layer]);
     }
   };
   
@@ -53,7 +43,6 @@ export default function RightSidebar({
           <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showMarinePanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
-        {/* ★ チェックボックスに変更！ */}
         {showMarinePanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
@@ -82,38 +71,18 @@ export default function RightSidebar({
           <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showFishPanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
+        {/* ★ ここをマダイ・ブリ・伊勢エビに変更しました！ */}
         {showFishPanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {['アジ・サバ', 'ヒラメ・カレイ', 'エビ・カニ', 'イカ・タコ'].map((fish, index) => (
+            {['マダイ', 'ブリ', '伊勢エビ'].map((fish) => (
               <label key={fish} className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-                <input type="checkbox" defaultChecked={index < 2} style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#8e24aa' }} /> {fish}
+                <input type="checkbox" style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#8e24aa' }} /> {fish}
               </label>
             ))}
           </div>
         )}
       </div>
 
-      {/* 3. 環境DNA (eDNA) */}
-      <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="layer-btn" onClick={() => setShowEdnaPanel(!showEdnaPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
-          <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <div className="layer-color green" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#2e7d32' }}></div>
-            <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
-              <span className="layer-title" style={{ fontSize: '40px', fontWeight: 'bold', lineHeight: 1.2 }}>環境DNA</span>
-              <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>eDNAヒートマップ</span>
-            </div>
-          </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showEdnaPanel ? 'expand_more' : 'expand_less'}</span>
-        </div>
-
-        {showEdnaPanel && (
-          <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showEdnaHeatmap} onChange={(e) => setShowEdnaHeatmap(e.target.checked)} style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#2e7d32' }} /> eDNA分布を表示
-            </label>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
