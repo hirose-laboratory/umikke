@@ -117,6 +117,13 @@ export default function HeatmapPage() {
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth());
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
+  const [activeMarineLayer, setActiveMarineLayer] = useState<string>('sst');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  const arrowMarkersRef = useRef<any[]>([]);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
   
@@ -274,37 +281,74 @@ export default function HeatmapPage() {
   }, [isPlaying]);
 
   // ==========================================
-  // ヒートマップ描画処理（固定値対応 15℃〜25℃）
+  // ★ 水温ヒートマップと流速矢印を描画する処理（ラジオボタン連動）
   // ==========================================
-  const updateHeatmapData = useCallback(() => {
-    if (!heatmapLayerRef.current || typeof window === 'undefined' || !window.google) return;
+  const updateMapLayers = useCallback(() => {
+    if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
     const google = window.google;
     const allPoints = oceanPointsRef.current;
     const targetYear = selectedFullDate.getFullYear();
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
 
-    const points = allPoints.filter((p) => {
-      if (p.sst === null || p.sst === undefined) return false;
+    // その日のデータだけ抽出
+    const todayPoints = allPoints.filter((p) => {
       const pDate = new Date(p.record_timestamp);
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
-    }).map((p) => {
-      // 15℃を0基準とし、25℃で最大(10)になるようにスケール変換
-      const weightValue = Math.max(0, (p.sst as number) - 15);
-      return {
-        location: new google.maps.LatLng(p.latitude, p.longitude),
-        weight: weightValue,
-      };
     });
 
-    heatmapLayerRef.current.setData(points);
-    // maxIntensityを10に固定することで、25℃以上の値が最高色（赤）になる
-    heatmapLayerRef.current.setOptions({ maxIntensity: 10, radius: 45 });
-  }, [selectedFullDate]);
+    // 1. 水温（ヒートマップ）の更新
+    if (heatmapLayerRef.current) {
+      if (activeMarineLayer === 'sst') {
+        const heatPoints = todayPoints.filter(p => p.sst !== null && p.sst !== undefined).map((p) => {
+          const weightValue = Math.max(0, (p.sst as number) - 15);
+          return {
+            location: new google.maps.LatLng(p.latitude, p.longitude),
+            weight: weightValue,
+          };
+        });
+        heatmapLayerRef.current.setData(heatPoints);
+        heatmapLayerRef.current.setOptions({ maxIntensity: 10, radius: 45 });
+      } else {
+        // 水温以外のボタンが押されている時はヒートマップを消す
+        heatmapLayerRef.current.setData([]);
+      }
+    }
 
+    // 2. 流向・流速（矢印）の更新
+    arrowMarkersRef.current.forEach(marker => marker.setMap(null));
+    arrowMarkersRef.current = [];
+
+    if (activeMarineLayer === 'current') {
+      todayPoints.forEach(p => {
+        // ★データベースに current_speed や current_direction が無くても表示されるよう、一旦固定値を入れています。
+        // もしデータベースの実際の値を使いたい場合は (p.current_speed ?? 0) のように戻してください。
+        const speed = Number(p.current_speed ?? 1.5); 
+        const direction = Number(p.current_direction ?? 0);
+
+        if (speed > 0) {
+          const arrowMarker = new google.maps.Marker({
+            position: { lat: Number(p.latitude), lng: Number(p.longitude) },
+            map: mapInstanceRef.current,
+            icon: {
+              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              scale: 25, // ★★★ ここを 25 というバカでかいサイズに設定！ ★★★
+              rotation: direction,
+              fillColor: '#FF0000', // 赤色で目立たせる
+              fillOpacity: 1.0,
+              strokeColor: 'white',
+              strokeWeight: 3 // 枠線も太く
+            },
+            zIndex: 1000
+          });
+          arrowMarkersRef.current.push(arrowMarker);
+        }
+      });
+    }
+  }, [selectedFullDate, activeMarineLayer]); // ★ activeMarineLayer の変更を監視
   useEffect(() => {
-    if (!mapReady) return; updateHeatmapData();
-  }, [mapReady, oceanDataVersion, updateHeatmapData]);
+    if (!mapReady) return; updateMapLayers();
+  }, [mapReady, oceanDataVersion, updateMapLayers]);
 
 
   // ==========================================
@@ -551,6 +595,7 @@ export default function HeatmapPage() {
     } else { alert('ブラウザが位置情報に対応していません。'); }
   };
 
+  if (!isMounted) return null;
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
@@ -569,8 +614,8 @@ export default function HeatmapPage() {
           <RightSidebar
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
+            activeMarineLayer={activeMarineLayer} setActiveMarineLayer={setActiveMarineLayer}
           />
-
           {/* ★修正: 左下凡例 15〜25℃の固定値。20℃の記述は完全に削除しました */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>
@@ -624,4 +669,4 @@ export default function HeatmapPage() {
       </div>
     </>
   );
-}
+  }

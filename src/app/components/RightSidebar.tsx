@@ -6,6 +6,9 @@ interface RightSidebarProps {
   setShowMarinePanel: (show: boolean) => void;
   showFishPanel: boolean;
   setShowFishPanel: (show: boolean) => void;
+  // ★変更：1つだけ選ぶので文字列（string）にする
+  activeMarineLayer: string;
+  setActiveMarineLayer: (layer: string) => void;
 }
 
 export default function RightSidebar({
@@ -13,7 +16,10 @@ export default function RightSidebar({
   setShowMarinePanel,
   showFishPanel,
   setShowFishPanel,
+  activeMarineLayer,
+  setActiveMarineLayer,
 }: RightSidebarProps) {
+  
   return (
     <div
       className="right-sidebar"
@@ -38,22 +44,23 @@ export default function RightSidebar({
           </span>
         </div>
 
+        {/* ★ラジオボタンに変更！ */}
         {showMarinePanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marine-data" defaultChecked style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 水温
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
+              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'sst'} onChange={() => setActiveMarineLayer('sst')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 水温
             </label>
-            <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marine-data" style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> クロロフィルa濃度
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
+              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'chl'} onChange={() => setActiveMarineLayer('chl')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> クロロフィルa濃度
             </label>
-            <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="radio" name="marine-data" style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 流向・流速
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
+              <input type="radio" name="marineLayer" checked={activeMarineLayer === 'current'} onChange={() => setActiveMarineLayer('current')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 流向・流速
             </label>
           </div>
         )}
       </div>
 
-      {/* 魚種分布 */}
+      {/* 魚種分布（今のところ変更なし） */}
       <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div
           className="layer-btn"
