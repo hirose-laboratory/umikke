@@ -400,7 +400,7 @@ export default function HeatmapPage() {
             pDate.getMonth() === targetMonth &&
             pDate.getDate() === targetDateNum;
 
-          return isFishMatch && isDateMatch;
+          return isFishMatch && isDateMatch;;
         });
 
         // 描画データを作成（concentration または heatmap_value を使用）
@@ -474,29 +474,49 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL]);
 
-  // 2. 魚種予測データの取得
+  // 2. 魚種eDNA実測データの取得（fish_idごとに取得して結合）
   useEffect(() => {
-    async function fetchFishPredictionData() {
-      try {
-        // ★ エンドポイントを /edna に変更（バックエンドの設定に合わせて調整してください）
-        const res = await fetch(`${API_BASE_URL}/edna`); 
-        
-        if (!res.ok) {
-          console.error(`eDNAデータ取得エラー: Status ${res.status}`);
-          return;
-        }
+    async function fetchFishData() {
+      // 選択されている魚種がなければクリア
+      if (activeFishLayers.length === 0) {
+        fishPointsRef.current = [];
+        setOceanDataVersion((v) => v + 1);
+        return;
+      }
 
-        const data = await res.json();
-        console.log('★取得したeDNAデータ:', data); // 取得成功の確認用
-        fishPointsRef.current = data;
+      // 選択された魚種名から ID リストを作成（マダイ:1, ブリ:2, 伊勢エビ:3）
+      const fishIds: number[] = activeFishLayers.map((name) => {
+        if (name === 'マダイ') return 1;
+        if (name === 'ブリ') return 2;
+        if (name === '伊勢エビ') return 3;
+        return 0;
+      }).filter((id) => id > 0);
+
+      try {
+        // 各 fish_id の API (/fish/{id}/edna) を同時に呼び出し
+        const requests = fishIds.map((id) =>
+          fetch(`${API_BASE_URL}/fish/${id}/edna`).then((res) => {
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            return res.json();
+          })
+        );
+
+        // 全てのデータを取得して1つの配列に結合
+        const results = await Promise.all(requests);
+        const combinedData = results.flat();
+
+        console.log('★eDNAデータ取得成功:', combinedData);
+        fishPointsRef.current = combinedData;
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
-        console.error('魚種予測データの取得に失敗しました:', err);
+        console.error('eDNAデータの取得に失敗しました:', err);
       }
     }
-    fetchFishPredictionData();
-  }, [API_BASE_URL]);
 
+    fetchFishData();
+  }, [API_BASE_URL, activeFishLayers]);
+
+  
   // 3. 漁場サジェスト（Hotpoints）の取得
   useEffect(() => {
     async function fetchHotpoints() {
