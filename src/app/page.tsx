@@ -373,7 +373,7 @@ export default function HeatmapPage() {
 
     // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
     if (fishHeatmapLayerRef.current) {
-      if (activeFishLayers.length > 0) {
+      if (activeFishLayers.length > 0  && isLoggedIn) {
         const allFishPoints = fishPointsRef.current;
         
         // 選択中の魚種IDリスト
@@ -516,7 +516,7 @@ export default function HeatmapPage() {
     fetchFishData();
   }, [API_BASE_URL, activeFishLayers]);
 
-  
+
   // 3. 漁場サジェスト（Hotpoints）の取得
   useEffect(() => {
     async function fetchHotpoints() {
@@ -733,6 +733,28 @@ export default function HeatmapPage() {
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
+
+          <div style={{
+            position: 'absolute',
+            top: '25px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+            pointerEvents: 'none', // 地図のクリック操作を妨げない設定
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <img 
+              src="/site-logo.png" 
+              alt="サイトロゴ" 
+              style={{ 
+                height: '45px', // 画像の高さ（好みのサイズに調整可能）
+                width: 'auto',
+                filter: 'drop-shadow(0px 2px 6px rgba(0, 0, 0, 0.6))' // 地図上でも見えやすい影
+              }} 
+            />
+          </div>
 
           <TopRightMenu
             isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail} setShowWindyMenu={setShowWindyMenu}
