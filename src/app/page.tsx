@@ -749,8 +749,8 @@ export default function HeatmapPage() {
               src="/site-logo.png" 
               alt="サイトロゴ" 
               style={{ 
-                height: '45px', // 画像の高さ（好みのサイズに調整可能）
-                width: 'auto',
+                height: '50px', 
+                width: '100px',
                 filter: 'drop-shadow(0px 2px 6px rgba(0, 0, 0, 0.6))' // 地図上でも見えやすい影
               }} 
             />
