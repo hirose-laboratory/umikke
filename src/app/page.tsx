@@ -749,7 +749,7 @@ export default function HeatmapPage() {
               src="/site-logo.png" 
               alt="サイトロゴ" 
               style={{ 
-                height: '200px', 
+                height: '100px', 
                 width: 'auto',
                 filter: 'drop-shadow(0px 2px 6px rgba(0, 0, 0, 0.6))' // 地図上でも見えやすい影
               }} 
