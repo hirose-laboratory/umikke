@@ -110,6 +110,9 @@ export default function HeatmapPage() {
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
   const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
+  const [marineTheme, setMarineTheme] = useState<string>('default');
+  const [fishTheme, setFishTheme] = useState<string>('default');
+  const [heatmapTheme, setHeatmapTheme] = useState<string>('default');
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -313,22 +316,17 @@ export default function HeatmapPage() {
         });
 
         let gradient = null;
-        if (hasSst && hasChl) {
-          gradient = [
-            'rgba(255, 0, 255, 0)',
-            'rgba(128, 0, 128, 1)',
-            'rgba(255, 0, 255, 1)',
-            'rgba(255, 0, 0, 1)'
-          ];
-        } else if (hasChl) {
-          gradient = [
-            'rgba(0, 255, 0, 0)',
-            'rgba(0, 255, 0, 1)',
-            'rgba(173, 255, 47, 1)',
-            'rgba(255, 255, 0, 1)'
-          ];
+        if (marineTheme === 'rainbow') {
+          gradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+        } else if (marineTheme === 'ocean') {
+          gradient = ['rgba(0,105,148,0)', '#006994', '#00b4d8', '#90e0ef', '#caf0f8'];
         } else {
-          gradient = null; 
+          // デフォルト（既存の設定）
+          if (hasSst && hasChl) {
+            gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
+          } else if (hasChl) {
+            gradient = ['rgba(0, 255, 0, 0)', 'rgba(0, 255, 0, 1)', 'rgba(173, 255, 47, 1)', 'rgba(255, 255, 0, 1)'];
+          }
         }
 
         heatmapLayerRef.current.setData(heatPoints);
@@ -414,13 +412,25 @@ export default function HeatmapPage() {
         });
 
         console.log('★表示対象のデータ件数:', fishHeatData.length);
-
+        
+        
+        /*
         const fishGradient = [
           'rgba(142, 36, 170, 0)',   // 透明な紫
           'rgba(142, 36, 170, 1)',   // 紫
           'rgba(255, 152, 0, 1)',    // オレンジ
           'rgba(255, 235, 59, 1)'    // 黄色
         ];
+        */
+
+        let fishGradient;
+        if (fishTheme === 'rainbow') {
+          fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+        } else if (fishTheme === 'colorblind') {
+          fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
+        } else {
+          fishGradient = ['rgba(142, 36, 170, 0)', 'rgba(142, 36, 170, 1)', 'rgba(255, 152, 0, 1)', 'rgba(255, 235, 59, 1)'];
+        }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
@@ -767,6 +777,8 @@ export default function HeatmapPage() {
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
             isLoggedIn={isLoggedIn} 
+            marineTheme={marineTheme} setMarineTheme={setMarineTheme} // ★追加
+            fishTheme={fishTheme} setFishTheme={setFishTheme}
           />
 
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
