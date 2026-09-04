@@ -140,16 +140,15 @@ export default function HeatmapPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
   const AUTH_STORAGE_KEY = 'umikke_auth';
 
-  // ★ テーマに応じたカラーバー（凡例）のグラデーションスタイルを生成
   const legendGradientStyle = useMemo(() => {
-    if (marineTheme === 'rainbow') {
-      return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
-    } else if (marineTheme === 'ocean') {
-      return 'linear-gradient(to right, #006994, #00b4d8, #90e0ef, #caf0f8)';
-    }
-    // デフォルト（赤紫〜赤）
-    return 'linear-gradient(to right, rgba(255, 0, 255, 1), rgba(128, 0, 128, 1), rgba(255, 0, 255, 1), rgba(255, 0, 0, 1))';
-  }, [marineTheme]);
+  if (marineTheme === 'rainbow') {
+    return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+  } else if (marineTheme === 'ocean') {
+    return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
+  }
+  // デフォルト表示の色
+  return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+}, [marineTheme]);
 
   // ==========================================
   // 認証処理系
