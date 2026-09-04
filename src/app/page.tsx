@@ -766,6 +766,8 @@ export default function HeatmapPage() {
           <TopRightMenu
             isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail} setShowWindyMenu={setShowWindyMenu}
             setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
+            marineTheme={marineTheme} setMarineTheme={setMarineTheme}
+            fishTheme={fishTheme} setFishTheme={setFishTheme}
           />
 
           <RightSidebar
