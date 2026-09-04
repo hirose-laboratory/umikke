@@ -10,11 +10,6 @@ interface RightSidebarProps {
   activeFishLayers: string[];
   setActiveFishLayers: (layers: string[]) => void;
   isLoggedIn?: boolean;
-  // ★ 追加：それぞれのテーマ設定を受け取る
-  marineTheme?: string;
-  setMarineTheme?: (theme: string) => void;
-  fishTheme?: string;
-  setFishTheme?: (theme: string) => void;
 }
 
 export default function RightSidebar({
@@ -27,10 +22,6 @@ export default function RightSidebar({
   activeFishLayers,
   setActiveFishLayers,
   isLoggedIn = false,
-  marineTheme = 'default',
-  setMarineTheme,
-  fishTheme = 'default',
-  setFishTheme,
 }: RightSidebarProps) {
 
   // 海況データの切り替え
@@ -113,39 +104,6 @@ export default function RightSidebar({
             ))}
           </div>
         )}
-      </div>
-
-      {/* 3. 詳細設定（色変更メニュー） */}
-      <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', padding: '24px 32px', boxSizing: 'border-box', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
-        <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '28px' }}>⚙️ 詳細設定</h3>
-        
-        {/* 海況データの設定 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <span style={{ color: 'white', fontSize: '24px' }}>海況ヒートマップ:</span>
-          <select 
-            value={marineTheme} 
-            onChange={(e) => setMarineTheme && setMarineTheme(e.target.value)}
-            style={{ fontSize: '20px', padding: '8px', borderRadius: '8px', width: '220px', cursor: 'pointer' }}
-          >
-            <option value="default">デフォルト (赤紫)</option>
-            <option value="rainbow">レインボー</option>
-            <option value="ocean">オーシャン (青)</option>
-          </select>
-        </div>
-
-        {/* 魚種データの設定（ログイン時のみ操作可能） */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: isLoggedIn ? 1 : 0.5, pointerEvents: isLoggedIn ? 'auto' : 'none' }}>
-          <span style={{ color: 'white', fontSize: '24px' }}>魚種ヒートマップ:</span>
-          <select 
-            value={fishTheme} 
-            onChange={(e) => setFishTheme && setFishTheme(e.target.value)}
-            style={{ fontSize: '20px', padding: '8px', borderRadius: '8px', width: '220px', cursor: 'pointer' }}
-          >
-            <option value="default">デフォルト (紫〜黄)</option>
-            <option value="rainbow">レインボー</option>
-            <option value="colorblind">カラーブラインド</option>
-          </select>
-        </div>
       </div>
 
     </div>

@@ -1,4 +1,3 @@
-// src/components/WindyMenu.tsx
 'use client';
 
 interface WindyMenuProps {
@@ -10,6 +9,11 @@ interface WindyMenuProps {
   handleDeleteAccount: () => void;
   setIsSignUp: (isSignUp: boolean) => void;
   setShowLoginModal: (show: boolean) => void;
+  // ★ 追加：それぞれのテーマ設定を受け取る
+  marineTheme?: string;
+  setMarineTheme?: (theme: string) => void;
+  fishTheme?: string;
+  setFishTheme?: (theme: string) => void;
 }
 
 export default function WindyMenu({
@@ -20,7 +24,11 @@ export default function WindyMenu({
   handleLogout,
   handleDeleteAccount,
   setIsSignUp,
-  setShowLoginModal
+  setShowLoginModal,
+  marineTheme = 'default',
+  setMarineTheme,
+  fishTheme = 'default',
+  setFishTheme,
 }: WindyMenuProps) {
   return (
     <>
@@ -60,7 +68,42 @@ export default function WindyMenu({
             </div>
           )}
 
-          
+          {/* ★ ここに追加：表示設定（色彩設定）エリア */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>DISPLAY SETTINGS</div>
+            
+            {/* 海況ヒートマップ色彩 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ fontSize: '22px', color: '#e0e0e0' }}>海況ヒートマップ色彩</label>
+              <select
+                value={marineTheme}
+                onChange={(e) => setMarineTheme && setMarineTheme(e.target.value)}
+                style={{ fontSize: '22px', padding: '16px', borderRadius: '16px', backgroundColor: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer' }}
+              >
+                <option value="default">デフォルト (赤紫)</option>
+                <option value="rainbow">レインボー</option>
+                <option value="ocean">オーシャン (青)</option>
+              </select>
+            </div>
+
+            {/* 魚種ヒートマップ色彩 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: isLoggedIn ? 1 : 0.5 }}>
+              <label style={{ fontSize: '22px', color: '#e0e0e0' }}>
+                魚種ヒートマップ色彩 {!isLoggedIn && '(要ログイン)'}
+              </label>
+              <select
+                value={fishTheme}
+                onChange={(e) => setFishTheme && setFishTheme(e.target.value)}
+                disabled={!isLoggedIn}
+                style={{ fontSize: '22px', padding: '16px', borderRadius: '16px', backgroundColor: '#333', color: 'white', border: '1px solid #555', cursor: isLoggedIn ? 'pointer' : 'not-allowed' }}
+              >
+                <option value="default">デフォルト (紫〜黄)</option>
+                <option value="rainbow">レインボー</option>
+                <option value="colorblind">カラーブラインド</option>
+              </select>
+            </div>
+          </div>
+
         </div>
       </div>
     </>
