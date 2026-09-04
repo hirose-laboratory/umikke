@@ -321,12 +321,9 @@ export default function HeatmapPage() {
         } else if (marineTheme === 'ocean') {
           gradient = ['rgba(0,105,148,0)', '#006994', '#00b4d8', '#90e0ef', '#caf0f8'];
         } else {
-          // デフォルト（既存の設定）
-          if (hasSst && hasChl) {
-            gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
-          } else if (hasChl) {
-            gradient = ['rgba(0, 255, 0, 0)', 'rgba(0, 255, 0, 1)', 'rgba(173, 255, 47, 1)', 'rgba(255, 255, 0, 1)'];
-          }
+          // デフォルト
+          if (hasSst && hasChl) gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
+          else if (hasChl) gradient = ['rgba(0, 255, 0, 0)', 'rgba(0, 255, 0, 1)', 'rgba(173, 255, 47, 1)', 'rgba(255, 255, 0, 1)'];
         }
 
         heatmapLayerRef.current.setData(heatPoints);
