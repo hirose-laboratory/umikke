@@ -140,6 +140,17 @@ export default function HeatmapPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
   const AUTH_STORAGE_KEY = 'umikke_auth';
 
+  // ★ テーマに応じたカラーバー（凡例）のグラデーションスタイルを生成
+  const legendGradientStyle = useMemo(() => {
+    if (marineTheme === 'rainbow') {
+      return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    } else if (marineTheme === 'ocean') {
+      return 'linear-gradient(to right, #006994, #00b4d8, #90e0ef, #caf0f8)';
+    }
+    // デフォルト（赤紫〜赤）
+    return 'linear-gradient(to right, rgba(255, 0, 255, 1), rgba(128, 0, 128, 1), rgba(255, 0, 255, 1), rgba(255, 0, 0, 1))';
+  }, [marineTheme]);
+
   // ==========================================
   // 認証処理系
   // ==========================================
@@ -730,9 +741,10 @@ export default function HeatmapPage() {
             isLoggedIn={isLoggedIn}
           />
 
+          {/* 温度凡例カラーバー (marineTheme と連動して色が変化) */}
           <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
             <span style={{ fontWeight: 'bold' }}>15℃</span>
-            <div className="slider-bar" style={{ width: '260px', height: '24px', background: 'linear-gradient(to right, rgba(0,0,255,1), rgba(0,255,255,1), rgba(0,255,0,1), rgba(255,255,0,1), rgba(255,165,0,1), rgba(255,0,0,1))', borderRadius: '12px' }}>
+            <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
             </div>
             <span style={{ fontWeight: 'bold' }}>25℃</span>
           </div>
