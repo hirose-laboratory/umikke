@@ -150,6 +150,13 @@ export default function HeatmapPage() {
   return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
 }, [marineTheme]);
 
+const fishLegendGradientStyle = useMemo(() => {
+    if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
+    // デフォルト（紫〜オレンジ〜黄）
+    return 'linear-gradient(to right, rgba(142, 36, 170, 1), rgba(255, 152, 0, 1), rgba(255, 235, 59, 1))';
+  }, [fishTheme]);
+
   // ==========================================
   // 認証処理系
   // ==========================================
@@ -343,12 +350,16 @@ export default function HeatmapPage() {
         const direction = Number(p.current_direction ?? 0);
 
         if (speed > 0) {
+          // ★ 流速(speed)に係数を掛けて長さを計算（係数30はデータに合わせて調整してください）
+          const arrowLength = Math.max(12, speed * 30); 
+          
           const arrowMarker = new google.maps.Marker({
             position: { lat: Number(p.latitude), lng: Number(p.longitude) },
             map: mapInstanceRef.current,
             icon: {
-              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-              scale: Math.max(3, speed * 5),
+              // ★ カスタムSVGパスで、上向き（0度）の矢印を描画し、長さを変数で指定
+              path: `M -3,0 L 0,-${arrowLength} L 3,0 L 0,-${arrowLength * 0.7} Z`,
+              scale: 1, // スケールは固定し、パスの座標で大きさを変える
               rotation: direction,
               fillColor: '#FF0000',
               fillOpacity: 0.9,
@@ -740,12 +751,29 @@ export default function HeatmapPage() {
             isLoggedIn={isLoggedIn}
           />
 
-          {/* 温度凡例カラーバー (marineTheme と連動して色が変化) */}
-          <div className="slider-container" style={{ position: 'absolute', bottom: '290px', left: '30px', background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
-            <span style={{ fontWeight: 'bold' }}>15℃</span>
-            <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
-            </div>
-            <span style={{ fontWeight: 'bold' }}>25℃</span>
+          {/* 凡例コンテナ（複数表示時に縦に並べる） */}
+          <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
+            
+            {/* 海況（温度）凡例 */}
+            {activeMarineLayers.includes('sst') && (
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
+                <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right' }}>15℃</span>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
+                </div>
+                <span style={{ fontWeight: 'bold', width: '60px' }}>25℃</span>
+              </div>
+            )}
+
+            {/* 魚種（eDNA）凡例 */}
+            {activeFishLayers.length > 0 && (
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
+                <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
+                </div>
+                <span style={{ fontWeight: 'bold', width: '60px', fontSize: '18px' }}>高濃度</span>
+              </div>
+            )}
+
           </div>
 
           {(oceanLoading || oceanError) && (
