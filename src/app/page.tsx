@@ -751,7 +751,7 @@ const fishLegendGradientStyle = useMemo(() => {
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
-            isLoggedIn={isLoggedIn}
+            isLoggedIn={true}
           />
 
           {/* 凡例コンテナ（温度と魚種を縦に並べる） */}
