@@ -350,7 +350,7 @@ const fishLegendGradientStyle = useMemo(() => {
         const direction = Number(p.current_direction ?? 0);
 
         if (speed > 0) {
-          const arrowLength = 10 + (speed * 40);
+          const arrowLength = 10 + (speed * 100);
 
           // 先端(M)のY座標だけに arrowLength を適用し、根本の太さは固定
           const customArrowPath = `M 0,-${arrowLength} L 6,6 L 0,2 L -6,6 Z`;
