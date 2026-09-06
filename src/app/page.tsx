@@ -153,7 +153,7 @@ export default function HeatmapPage() {
 const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
     if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
-    // デフォルト（紫〜オレンジ〜黄）
+    // デフォルト（地図上のヒートマップと同じ紫〜オレンジ〜黄）
     return 'linear-gradient(to right, rgba(142, 36, 170, 1), rgba(255, 152, 0, 1), rgba(255, 235, 59, 1))';
   }, [fishTheme]);
 
@@ -754,30 +754,31 @@ const fishLegendGradientStyle = useMemo(() => {
             isLoggedIn={isLoggedIn}
           />
 
-          {/* 凡例コンテナ（複数表示時に縦に並べる） */}
+          {/* 凡例コンテナ（温度と魚種を縦に並べる） */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
             
-            {/* 海況（温度）凡例 */}
+            {/* 海況（温度）凡例：sstレイヤーがオンの時だけ表示 */}
             {activeMarineLayers.includes('sst') && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right' }}>15℃</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px' }}>
                 </div>
                 <span style={{ fontWeight: 'bold', width: '60px' }}>25℃</span>
               </div>
             )}
 
-            {/* 魚種（eDNA）凡例 */}
-            {activeFishLayers.length > 0 && (
+            {/* 魚種（eDNA）凡例：ログイン済み かつ 魚種レイヤーがオンの時だけ表示 */}
+            {isLoggedIn && activeFishLayers.length > 0 && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px', transition: 'background 0.3s ease' }}>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}>
                 </div>
                 <span style={{ fontWeight: 'bold', width: '60px', fontSize: '18px' }}>高濃度</span>
               </div>
             )}
 
           </div>
+
 
           {(oceanLoading || oceanError) && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: oceanError ? 'auto' : 'none', display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '80vw' }}>
