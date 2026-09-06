@@ -378,7 +378,7 @@ const fishLegendGradientStyle = useMemo(() => {
 
     // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
     if (fishHeatmapLayerRef.current) {
-      if (activeFishLayers.length > 0  && isLoggedIn) {
+      if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
