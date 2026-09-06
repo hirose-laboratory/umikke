@@ -350,18 +350,17 @@ const fishLegendGradientStyle = useMemo(() => {
         const direction = Number(p.current_direction ?? 0);
 
         if (speed > 0) {
-          // ★ 流速(speed)に係数を掛けて長さを計算（係数30はデータに合わせて調整してください）
-          const arrowLength = Math.max(12, speed * 30); 
+          const length = Math.max(2, speed * 5);
+          const customArrowPath = `M -1.5,1 L 0,-${length} L 1.5,1 L 0,0 Z`;
           
           const arrowMarker = new google.maps.Marker({
             position: { lat: Number(p.latitude), lng: Number(p.longitude) },
             map: mapInstanceRef.current,
             icon: {
-              // ★ カスタムSVGパスで、上向き（0度）の矢印を描画し、長さを変数で指定
-              path: `M -3,0 L 0,-${arrowLength} L 3,0 L 0,-${arrowLength * 0.7} Z`,
-              scale: 1, // スケールは固定し、パスの座標で大きさを変える
+              path: customArrowPath,
+              scale: 4, // 矢印の基本的な大きさ（太さ）
               rotation: direction,
-              fillColor: '#FF0000',
+              fillColor: '#FF0000', // 元の赤いデザイン
               fillOpacity: 0.9,
               strokeColor: 'white',
               strokeWeight: 1
@@ -373,6 +372,7 @@ const fishLegendGradientStyle = useMemo(() => {
       });
     }
 
+    
     // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0  && isLoggedIn) {
