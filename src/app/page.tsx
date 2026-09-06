@@ -350,23 +350,25 @@ const fishLegendGradientStyle = useMemo(() => {
         const direction = Number(p.current_direction ?? 0);
 
         if (speed > 0) {
-          // ★ 流速に応じて先端（前方）への伸び幅を計算
-          const arrowLength = Math.max(3, speed * 6);
+          // ★ 流速に応じて先端の長さを決める（最低値10、速度に応じて前方に伸びる）
+          // ※矢印の伸び具合を変えたい場合は、この「15」の係数を調整してください
+          const arrowLength = Math.max(10, speed * 15);
 
-          // ★ 横幅（-2 〜 2）を広めに取り、元のデザインに近いふっくらとした矢印を再現
-          const customArrowPath = `M -2,1.5 L 0,-${arrowLength} L 2,1.5 L 0,0.5 Z`;
+          // ★ 元の赤い矢印に近い、ふっくらとした形を絶対座標で定義
+          // M: 先端, L: 右下, L: 中央のくぼみ, L: 左下, Z: 閉じる
+          const customArrowPath = `M 0,-${arrowLength} L 6,6 L 0,2 L -6,6 Z`;
           
           const arrowMarker = new google.maps.Marker({
             position: { lat: Number(p.latitude), lng: Number(p.longitude) },
             map: mapInstanceRef.current,
             icon: {
               path: customArrowPath,
-              scale: 3,             // 全体の基準となる太さ
+              scale: 1.2,           // 全体のサイズ感（大きすぎず小さすぎず）
               rotation: direction,
-              fillColor: '#FF0000', // 元の鮮やかな赤
-              fillOpacity: 1.0,     // 不透明度を1.0にしてくっきりさせる
+              fillColor: '#FF0000', // 目視しやすい鮮やかな赤
+              fillOpacity: 1.0,     // 透けさせずくっきり表示
               strokeColor: 'white', // 白いフチドリ
-              strokeWeight: 1.5     // フチを少し太くして地図上での視認性を高める
+              strokeWeight: 1       // 白線が太すぎて赤色を潰さないよう「1」に設定
             },
             zIndex: 1000
           });
@@ -374,6 +376,8 @@ const fishLegendGradientStyle = useMemo(() => {
         }
       });
     }
+
+    
 
     // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
     if (fishHeatmapLayerRef.current) {
