@@ -150,6 +150,11 @@ export default function HeatmapPage() {
   return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
 }, [marineTheme]);
 
+// ★ クロロフィル用カラーバー
+  const chlLegendGradientStyle = useMemo(() => {
+    return 'linear-gradient(to right, rgba(0, 255, 0, 1), rgba(173, 255, 47, 1), rgba(255, 255, 0, 1))';
+  }, []);
+
 const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
     if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
@@ -777,10 +782,10 @@ const fishLegendGradientStyle = useMemo(() => {
             isLoggedIn={isLoggedIn}
           />
 
-          {/* 凡例コンテナ（温度と魚種を縦に並べる） */}
+          {/* 凡例コンテナ（選択中の項目に応じて縦に並べる） */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
             
-            {/* 海況（温度）凡例：sstレイヤーがオンの時だけ表示 */}
+            {/* 海況（水温）凡例 */}
             {activeMarineLayers.includes('sst') && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right' }}>15℃</span>
@@ -790,8 +795,18 @@ const fishLegendGradientStyle = useMemo(() => {
               </div>
             )}
 
-            {/* 魚種（eDNA）凡例：ログイン済み かつ 魚種レイヤーがオンの時だけ表示 */}
-            {isLoggedIn && activeFishLayers.length > 0 && (
+            {/* クロロフィル凡例（新規追加） */}
+            {activeMarineLayers.includes('chl') && (
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
+                <span style={{ fontWeight: 'bold', minWidth: '70px', textAlign: 'right', fontSize: '18px' }}>0 mg/m³</span>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: chlLegendGradientStyle, borderRadius: '12px' }}>
+                </div>
+                <span style={{ fontWeight: 'bold', minWidth: '70px', fontSize: '18px' }}>20 mg/m³</span>
+              </div>
+            )}
+
+            {/* 魚種（eDNA）凡例 */}
+            {activeFishLayers.length > 0 && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
                 <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}>
