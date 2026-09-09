@@ -99,7 +99,7 @@ export default function HeatmapPage() {
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
-  const [activeFishLayers, setActiveFishLayers] = useState<string[]>(['マダイ']);
+  const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
   const [marineTheme, setMarineTheme] = useState<string>('default');
   const [fishTheme, setFishTheme] = useState<string>('default');
   const [isMounted, setIsMounted] = useState(false);
@@ -401,7 +401,7 @@ const fishLegendGradientStyle = useMemo(() => {
 
     // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
     if (fishHeatmapLayerRef.current) {
-      if (activeFishLayers.length > 0) {
+      if (activeFishLayers.length > 0 && isLoggedIn) {
         const allFishPoints = fishPointsRef.current;
         
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
@@ -774,7 +774,7 @@ const fishLegendGradientStyle = useMemo(() => {
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
-            isLoggedIn={true}
+            isLoggedIn={isLoggedIn}
           />
 
           {/* 凡例コンテナ（温度と魚種を縦に並べる） */}
@@ -791,7 +791,7 @@ const fishLegendGradientStyle = useMemo(() => {
             )}
 
             {/* 魚種（eDNA）凡例：ログイン済み かつ 魚種レイヤーがオンの時だけ表示 */}
-            {activeFishLayers.length > 0 && (
+            {isLoggedIn && activeFishLayers.length > 0 && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
                 <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}>
