@@ -345,33 +345,56 @@ const fishLegendGradientStyle = useMemo(() => {
     arrowMarkersRef.current = [];
 
     if (activeMarineLayers.includes('current')) {
-      todayPoints.forEach(p => {
-        const speed = Number(p.current_speed ?? 0); 
-        const direction = Number(p.current_direction ?? 0);
+      // 1. その日のデータから流速(speed > 0)のリストを抽出し、最小値と最大値を算出
+      const validSpeeds = todayPoints
+        .map(p => Number(p.current_speed ?? 0))
+        .filter(s => s > 0);
 
-        if (speed > 0) {
-          const arrowLength = 10 + (speed * 100);
+      if (validSpeeds.length > 0) {
+        const minSpeed = Math.min(...validSpeeds);
+        const maxSpeed = Math.max(...validSpeeds);
+        const speedRange = maxSpeed - minSpeed;
 
-          // 先端(M)のY座標だけに arrowLength を適用し、根本の太さは固定
-          const customArrowPath = `M 0,-${arrowLength} L 6,6 L 0,2 L -6,6 Z`;
-          
-          const arrowMarker = new google.maps.Marker({
-            position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-            map: mapInstanceRef.current,
-            icon: {
-              path: customArrowPath,
-              scale: 1.2,
-              rotation: direction,
-              fillColor: '#FF0000',
-              fillOpacity: 1.0,
-              strokeColor: 'white',
-              strokeWeight: 1
-            },
-            zIndex: 1000
-          });
-          arrowMarkersRef.current.push(arrowMarker);
-        }
-      });
+        // 矢印の最小長と最大長を設定 (ピクセル単位)
+        const MIN_ARROW_LENGTH = 8;  // 一番遅いデータの長さ
+        const MAX_ARROW_LENGTH = 36; // 一番速いデータの長さ
+
+        todayPoints.forEach(p => {
+          const speed = Number(p.current_speed ?? 0);
+          const direction = Number(p.current_direction ?? 0);
+
+          if (speed > 0) {
+            let arrowLength = MIN_ARROW_LENGTH;
+
+            // 最小値と最大値に差がある場合、0.0〜1.0 に正規化して長さを計算
+            if (speedRange > 0) {
+              const normalizedRatio = (speed - minSpeed) / speedRange; // 0〜1に変換
+              arrowLength = MIN_ARROW_LENGTH + (normalizedRatio * (MAX_ARROW_LENGTH - MIN_ARROW_LENGTH));
+            }
+
+            // 流速に応じて横幅(width)もほんの少し太くして目視しやすく調整
+            const arrowWidth = 5 + ((speed - minSpeed) / (speedRange || 1)) * 3; // 幅 5px 〜 8px
+
+            const customArrowPath = `M 0,-${arrowLength} L ${arrowWidth},6 L 0,2 L -${arrowWidth},6 Z`;
+
+            const arrowMarker = new google.maps.Marker({
+              position: { lat: Number(p.latitude), lng: Number(p.longitude) },
+              map: mapInstanceRef.current,
+              icon: {
+                path: customArrowPath,
+                scale: 1.2,
+                rotation: direction,
+                fillColor: '#FF0000',
+                fillOpacity: 1.0,
+                strokeColor: 'white',
+                strokeWeight: 1
+              },
+              zIndex: 1000
+            });
+            arrowMarkersRef.current.push(arrowMarker);
+          }
+        });
+      }
     }
 
 
