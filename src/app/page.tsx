@@ -99,7 +99,7 @@ export default function HeatmapPage() {
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
-  const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
+  const [activeFishLayers, setActiveFishLayers] = useState<string[]>(['マダイ']);
   const [marineTheme, setMarineTheme] = useState<string>('default');
   const [fishTheme, setFishTheme] = useState<string>('default');
   const [isMounted, setIsMounted] = useState(false);
