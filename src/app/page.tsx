@@ -756,11 +756,7 @@ const fishLegendGradientStyle = useMemo(() => {
             pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(255, 255, 255, 0.9)', // わずかに透けるクリーンな白背景
-            borderRadius: '12px', // 大きな角丸
-            padding: '10px 18px', // ロゴの周りに十分な余白
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)' // パネルを地図から浮かせる影
+            justifyContent: 'center'
           }}>
             <img 
               src="/site-logo.png" 
@@ -768,7 +764,13 @@ const fishLegendGradientStyle = useMemo(() => {
               style={{ 
                 height: '50px', 
                 width: 'auto',
-                filter: 'drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 4px #ffffff) drop-shadow(0 2px 4px rgba(0, 40, 80, 0.4))'
+                filter: `
+                  drop-shadow(2px 0 0 #ffffff) 
+                  drop-shadow(-2px 0 0 #ffffff) 
+                  drop-shadow(0 2px 0 #ffffff) 
+                  drop-shadow(0 -2px 0 #ffffff) 
+                  drop-shadow(0 3px 6px rgba(0, 30, 60, 0.5))
+                `
               }} 
             />
           </div>
