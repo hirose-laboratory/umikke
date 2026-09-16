@@ -762,9 +762,9 @@ const fishLegendGradientStyle = useMemo(() => {
               src="/site-logo.png" 
               alt="サイトロゴ" 
               style={{ 
-                height: '50px', 
+                height: '70px', 
                 width: 'auto',
-                filter: 'drop-shadow(0px 2px 6px rgba(0, 0, 0, 0.6))'
+                filter: 'drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 4px #ffffff) drop-shadow(0 2px 4px rgba(0, 40, 80, 0.4))'
               }} 
             />
           </div>
