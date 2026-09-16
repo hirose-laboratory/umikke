@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
-// === コンポーネントのインポート ===
+// ==========================================
+// 1. 外部コンポーネントのインポート
+// ==========================================
 import LoginModal from './components/LoginModal';
 import TopRightMenu from './components/TopRightMenu';
 import RightSidebar from './components/RightSidebar';
@@ -11,7 +13,7 @@ import MapControls from './components/MapControls';
 import WindyMenu from './components/WindyMenu';
 
 // ==========================================
-// ★ Google Maps 関連の型定義
+// 2. Google Maps ＆ データ型の定義
 // ==========================================
 interface GoogleMapInstance {
   getZoom: () => number;
@@ -73,65 +75,75 @@ interface Hotpoint {
 }
 
 export default function HeatmapPage() {
+  // ==========================================
+  // 3. Google Maps オブジェクト参照 (Ref)
+  // ==========================================
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
-  
   const fishPointsRef = useRef<FishPredictionPoint[]>([]);
   const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
-  
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
   const hotpointMarkersRef = useRef<GoogleMarkerInstance[]>([]);
+  const arrowMarkersRef = useRef<any[]>([]);
+  const oceanPointsRef = useRef<OceanDataPoint[]>([]);
 
+  // ==========================================
+  // 4. アプリケーション状態管理 (State)
+  // ==========================================
   const initDate = useMemo(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   }, []);
 
-  // --- 状態管理 (State) ---
+  // UI・タイムライン状態
   const [baseDate, setBaseDate] = useState<Date>(initDate);
   const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(false);
   const [calYear, setCalYear] = useState<number>(initDate.getFullYear());
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth());
+  const [isMounted, setIsMounted] = useState(false);
+
+  // レイヤー・テーマ選択状態
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
   const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
   const [marineTheme, setMarineTheme] = useState<string>('default');
   const [fishTheme, setFishTheme] = useState<string>('default');
-  const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const arrowMarkersRef = useRef<any[]>([]);
+  // ユーザー認証・モーダル状態
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
-  
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
-  
-  const oceanPointsRef = useRef<OceanDataPoint[]>([]);
+
+  // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
   const [oceanError, setOceanError] = useState<string | null>(null);
   const [oceanDataVersion, setOceanDataVersion] = useState<number>(0);
   const [oceanPointCount, setOceanPointCount] = useState<number>(0);
-  
   const [hotpoints, setHotpoints] = useState<Hotpoint[]>([]);
   const [mapReady, setMapReady] = useState<boolean>(false);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+  const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
-    const d = new Date(baseDate); d.setDate(d.getDate() + currentProgress); return d;
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + currentProgress);
+    return d;
   }, [baseDate, currentProgress]);
-  
+
   const selectedFullDateRef = useRef(selectedFullDate);
   useEffect(() => {
     selectedFullDateRef.current = selectedFullDate;
@@ -140,30 +152,27 @@ export default function HeatmapPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
   const AUTH_STORAGE_KEY = 'umikke_auth';
 
+  // ==========================================
+  // 5. 凡例カラーバーのスタイル定義
+  // ==========================================
   const legendGradientStyle = useMemo(() => {
-  if (marineTheme === 'rainbow') {
+    if (marineTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (marineTheme === 'ocean') return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
     return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
-  } else if (marineTheme === 'ocean') {
-    return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
-  }
-  // デフォルト表示の色
-  return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
-}, [marineTheme]);
+  }, [marineTheme]);
 
-// ★ クロロフィル用カラーバー
   const chlLegendGradientStyle = useMemo(() => {
     return 'linear-gradient(to right, rgba(0, 255, 0, 1), rgba(173, 255, 47, 1), rgba(255, 255, 0, 1))';
   }, []);
 
-const fishLegendGradientStyle = useMemo(() => {
+  const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
     if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
-    // デフォルト（地図上のヒートマップと同じ紫〜オレンジ〜黄）
     return 'linear-gradient(to right, rgba(142, 36, 170, 1), rgba(255, 152, 0, 1), rgba(255, 235, 59, 1))';
   }, [fishTheme]);
 
   // ==========================================
-  // 認証処理系
+  // 6. ユーザー認証機能 (ログイン / 登録 / 削除)
   // ==========================================
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
@@ -258,7 +267,7 @@ const fishLegendGradientStyle = useMemo(() => {
   }, []);
 
   // ==========================================
-  // 日付・タイムライン処理
+  // 7. タイムライン・日付制御
   // ==========================================
   const timelineDays = useMemo(() => {
     const days: TimelineDay[] = [];
@@ -284,7 +293,7 @@ const fishLegendGradientStyle = useMemo(() => {
   }, [isPlaying]);
 
   // ==========================================
-  // マップレイヤー描画処理
+  // 8. 地図レイヤー描画処理 (海況・流速・魚種)
   // ==========================================
   const updateMapLayers = useCallback(() => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
@@ -299,7 +308,7 @@ const fishLegendGradientStyle = useMemo(() => {
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
-    // --- 1. 海況ヒートマップ（水温・クロロフィル） ---
+    // 海況ヒートマップ (水温・クロロフィル)
     if (heatmapLayerRef.current) {
       const hasSst = activeMarineLayers.includes('sst');
       const hasChl = activeMarineLayers.includes('chl');
@@ -310,13 +319,9 @@ const fishLegendGradientStyle = useMemo(() => {
           const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
           const chlVal = Number((p as any).chl ?? 0) * 10;
 
-          if (hasSst && hasChl) {
-            weightValue = sstVal + chlVal;
-          } else if (hasSst) {
-            weightValue = sstVal;
-          } else if (hasChl) {
-            weightValue = chlVal;
-          }
+          if (hasSst && hasChl) weightValue = sstVal + chlVal;
+          else if (hasSst) weightValue = sstVal;
+          else if (hasChl) weightValue = chlVal;
 
           return {
             location: new google.maps.LatLng(p.latitude, p.longitude),
@@ -345,12 +350,11 @@ const fishLegendGradientStyle = useMemo(() => {
       }
     }
 
-    // --- 2. 流向・流速（矢印） ---
+    // 流向・流速ベクトル (矢印)
     arrowMarkersRef.current.forEach(marker => marker.setMap(null));
     arrowMarkersRef.current = [];
 
     if (activeMarineLayers.includes('current')) {
-      // 1. その日のデータから流速(speed > 0)のリストを抽出し、最小値と最大値を算出
       const validSpeeds = todayPoints
         .map(p => Number(p.current_speed ?? 0))
         .filter(s => s > 0);
@@ -360,9 +364,8 @@ const fishLegendGradientStyle = useMemo(() => {
         const maxSpeed = Math.max(...validSpeeds);
         const speedRange = maxSpeed - minSpeed;
 
-        // 矢印の最小長と最大長を設定 (ピクセル単位)
-        const MIN_ARROW_LENGTH = 8;  // 一番遅いデータの長さ
-        const MAX_ARROW_LENGTH = 36; // 一番速いデータの長さ
+        const MIN_ARROW_LENGTH = 8;
+        const MAX_ARROW_LENGTH = 36;
 
         todayPoints.forEach(p => {
           const speed = Number(p.current_speed ?? 0);
@@ -370,16 +373,12 @@ const fishLegendGradientStyle = useMemo(() => {
 
           if (speed > 0) {
             let arrowLength = MIN_ARROW_LENGTH;
-
-            // 最小値と最大値に差がある場合、0.0〜1.0 に正規化して長さを計算
             if (speedRange > 0) {
-              const normalizedRatio = (speed - minSpeed) / speedRange; // 0〜1に変換
+              const normalizedRatio = (speed - minSpeed) / speedRange;
               arrowLength = MIN_ARROW_LENGTH + (normalizedRatio * (MAX_ARROW_LENGTH - MIN_ARROW_LENGTH));
             }
 
-            // 流速に応じて横幅(width)もほんの少し太くして目視しやすく調整
-            const arrowWidth = 5 + ((speed - minSpeed) / (speedRange || 1)) * 3; // 幅 5px 〜 8px
-
+            const arrowWidth = 5 + ((speed - minSpeed) / (speedRange || 1)) * 3;
             const customArrowPath = `M 0,-${arrowLength} L ${arrowWidth},6 L 0,2 L -${arrowWidth},6 Z`;
 
             const arrowMarker = new google.maps.Marker({
@@ -402,9 +401,7 @@ const fishLegendGradientStyle = useMemo(() => {
       }
     }
 
-
-
-    // --- 3. 魚種分布（eDNA予測）ヒートマップ ---
+    // 魚種分布 (eDNA予測) ヒートマップ
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0 && isLoggedIn) {
         const allFishPoints = fishPointsRef.current;
@@ -466,10 +463,8 @@ const fishLegendGradientStyle = useMemo(() => {
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
-  // APIデータ取得系
+  // 9. バックエンドAPI通信 (海況 / eDNA / サジェスト)
   // ==========================================
-  const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
-
   useEffect(() => {
     let cancelled = false;
     async function fetchOceanData() {
@@ -549,7 +544,7 @@ const fishLegendGradientStyle = useMemo(() => {
   }, [API_BASE_URL]);
 
   // ==========================================
-  // マップ初期化 ＆ イベント登録
+  // 10. Google Maps 初期化 ＆ イベント初期設定
   // ==========================================
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -603,6 +598,7 @@ const fishLegendGradientStyle = useMemo(() => {
       
       infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
+      // 地図クリック時：最寄りの海洋観測データの詳細ポップアップを表示
       map.addListener('click', (e: any) => {
         const clickLat = e.latLng.lat();
         const clickLng = e.latLng.lng();
@@ -651,6 +647,7 @@ const fishLegendGradientStyle = useMemo(() => {
     return () => { cancelled = true; };
   }, []);
 
+  // 漁場サジェストマーカー描画
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -692,6 +689,9 @@ const fishLegendGradientStyle = useMemo(() => {
     });
   }, [hotpoints, mapReady]);
 
+  // ==========================================
+  // 11. カレンダー ＆ マップコントロール処理
+  // ==========================================
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
   const calendarCells: (number | null)[] = [];
@@ -737,16 +737,23 @@ const fishLegendGradientStyle = useMemo(() => {
   };
 
   if (!isMounted) return null;
+
+  // ==========================================
+  // 12. 画面UI描画 (JSX / レイアウト)
+  // ==========================================
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 
       <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', fontFamily: 'sans-serif', fontSize: '28px' }}>
 
+        {/* 地図キャンバス */}
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
+        {/* メインUIオーバーレイ */}
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
 
+          {/* ヘッダーロゴ */}
           <div style={{
             position: 'absolute',
             top: '25px',
@@ -775,11 +782,13 @@ const fishLegendGradientStyle = useMemo(() => {
             />
           </div>
 
+          {/* 右上アカウント・メニュー操作 */}
           <TopRightMenu
             isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail} setShowWindyMenu={setShowWindyMenu}
             setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
           />
 
+          {/* 右側レイヤー選択サイドバー */}
           <RightSidebar
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
@@ -788,42 +797,34 @@ const fishLegendGradientStyle = useMemo(() => {
             isLoggedIn={isLoggedIn}
           />
 
-          {/* 凡例コンテナ（選択中の項目に応じて縦に並べる） */}
+          {/* 左下動的凡例 (水温 / クロロフィル / 魚種濃度) */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
-            
-            {/* 海況（水温）凡例 */}
             {activeMarineLayers.includes('sst') && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right' }}>15℃</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px' }}>
-                </div>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', width: '60px' }}>25℃</span>
               </div>
             )}
 
-            {/* クロロフィル凡例（新規追加） */}
             {activeMarineLayers.includes('chl') && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', minWidth: '70px', textAlign: 'right', fontSize: '18px' }}>0 mg/m³</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: chlLegendGradientStyle, borderRadius: '12px' }}>
-                </div>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: chlLegendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', minWidth: '70px', fontSize: '18px' }}>20 mg/m³</span>
               </div>
             )}
 
-            {/* 魚種（eDNA）凡例 */}
             {activeFishLayers.length > 0 && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}>
-                </div>
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', width: '60px', fontSize: '18px' }}>高濃度</span>
               </div>
             )}
-
           </div>
 
-
+          {/* 左上データ取得ステータス表示 */}
           {(oceanLoading || oceanError) && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: oceanError ? 'auto' : 'none', display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '80vw' }}>
               <span>{oceanError ? `データ取得エラー: ${oceanError}` : 'データを同期中...'}</span>
@@ -838,20 +839,24 @@ const fishLegendGradientStyle = useMemo(() => {
             </div>
           )}
 
+          {/* 地図読み込みエラー表示 */}
           {mapLoadError && (
             <div style={{ position: 'absolute', top: (oceanLoading || oceanError) ? '90px' : '30px', left: '30px', background: '#c62828', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '22px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'none', maxWidth: '80vw' }}>
               地図エラー: {mapLoadError}
             </div>
           )}
 
+          {/* 下部タイムライン操作バー */}
           <TimelineBar
             isPlaying={isPlaying} setIsPlaying={setIsPlaying} timelineDays={timelineDays} currentProgress={currentProgress} setCurrentProgress={setCurrentProgress}
             showMiniCalendar={showMiniCalendar} setShowMiniCalendar={setShowMiniCalendar} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth}
             calendarCells={calendarCells} getCalendarDayStatus={getCalendarDayStatus} setBaseDate={setBaseDate} formattedSelectedDate={formattedSelectedDate}
           />
 
+          {/* 右下マップ操作ボタン (ズーム・現在地) */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
 
+          {/* ログイン・新規登録モーダル */}
           {showLoginModal && (
             <LoginModal
               setShowLoginModal={setShowLoginModal} isSignUp={isSignUp} setIsSignUp={setIsSignUp}
@@ -860,6 +865,7 @@ const fishLegendGradientStyle = useMemo(() => {
             />
           )}
 
+          {/* マイページ・テーマ設定メニュー */}
           <WindyMenu
             showWindyMenu={showWindyMenu} setShowWindyMenu={setShowWindyMenu} isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail}
             handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount} setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
