@@ -1,5 +1,8 @@
 'use client';
 
+// ==========================================
+// 1. 型定義 (Props)
+// ==========================================
 interface RightSidebarProps {
   showMarinePanel: boolean;
   setShowMarinePanel: (show: boolean) => void;
@@ -12,6 +15,9 @@ interface RightSidebarProps {
   isLoggedIn?: boolean;
 }
 
+// ==========================================
+// 2. 右側レイヤー選択サイドバーコンポーネント
+// ==========================================
 export default function RightSidebar({
   showMarinePanel,
   setShowMarinePanel,
@@ -24,7 +30,7 @@ export default function RightSidebar({
   isLoggedIn = false,
 }: RightSidebarProps) {
 
-  // 海況データの切り替え
+  // 海況レイヤーの表示切り替え
   const toggleMarineLayer = (layer: string) => {
     if (activeMarineLayers.includes(layer)) {
       setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer));
@@ -33,7 +39,7 @@ export default function RightSidebar({
     }
   };
 
-  // 魚種の切り替えロジック
+  // 魚種分布レイヤーの表示切り替え
   const toggleFishLayer = (fish: string) => {
     if (activeFishLayers.includes(fish)) {
       setActiveFishLayers(activeFishLayers.filter(f => f !== fish));
@@ -45,7 +51,7 @@ export default function RightSidebar({
   return (
     <div className="right-sidebar" style={{ position: 'absolute', top: '140px', right: '30px', display: 'flex', flexDirection: 'column', gap: '24px', pointerEvents: 'auto' }}>
       
-      {/* 1. 海況状況 */}
+      {/* 1. 海況状況パネル (水温 / クロロフィル / 流向・流速) */}
       <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="layer-btn" onClick={() => setShowMarinePanel(!showMarinePanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -73,9 +79,10 @@ export default function RightSidebar({
         )}
       </div>
 
-      {/* 2. 魚種分布（未ログイン時はモザイク） */}
+      {/* 2. 魚種分布パネル (マダイ / ブリ / 伊勢エビ) */}
       <div className="layer-container" style={{ position: 'relative', background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
+        {/* 未ログイン時ブロックオーバーレイ */}
         {!isLoggedIn && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '16px 28px', borderRadius: '40px', fontSize: '26px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '12px' }}>
