@@ -162,9 +162,8 @@ export default function HeatmapPage() {
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
-    return 'linear-gradient(to right, #800080, #ff00ff, #ff0000)';
+    return 'linear-gradient(to right, #7b1fa2, #e91e63, #ff1744)';
   }, []);
-
 
   const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
@@ -339,12 +338,11 @@ export default function HeatmapPage() {
           if (hasSst && hasChl) {
             gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
           } else if (hasChl) {
-            // クロロフィル単体の色を、水温＋クロロフィルの時と同じ鮮やかな色に統一
             gradient = [
-              'rgba(255, 0, 255, 0)',   // 透明
-              'rgba(128, 0, 128, 1)',   // 暗い紫
-              'rgba(255, 0, 255, 1)',   // 鮮やかなピンク紫(マゼンタ)
-              'rgba(255, 0, 0, 1)'      // 赤
+              'rgba(123, 31, 162, 0)',   // #7b1fa2 (透明な紫)
+              'rgba(123, 31, 162, 1)',   // #7b1fa2 (紫)
+              'rgba(233, 30, 99, 1)',    // #e91e63 (ピンク)
+              'rgba(255, 23, 68, 1)'     // #ff1744 (赤)
             ];
           }
         }
