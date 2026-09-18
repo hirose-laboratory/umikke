@@ -162,7 +162,7 @@ export default function HeatmapPage() {
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
-    return 'linear-gradient(to right, #e91e63, #7b1fa2, #ff1744)';
+    return 'linear-gradient(to right, #e91e63, #7b1fa2)';
   }, []);
 
 
