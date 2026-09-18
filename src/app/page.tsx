@@ -162,8 +162,9 @@ export default function HeatmapPage() {
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
-    return 'linear-gradient(to right, #7b1fa2, #e91e63, #ff1744)';
+    return 'linear-gradient(to right, #e91e63, #7b1fa2, #ff1744)';
   }, []);
+
 
   const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
@@ -335,9 +336,19 @@ export default function HeatmapPage() {
         } else if (marineTheme === 'ocean') {
           gradient = ['rgba(0,105,148,0)', '#006994', '#00b4d8', '#90e0ef', '#caf0f8'];
         } else {
-          if (hasSst && hasChl) gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
-          else if (hasChl) gradient = ['rgba(0, 255, 0, 0)', 'rgba(0, 255, 0, 1)', 'rgba(173, 255, 47, 1)', 'rgba(255, 255, 0, 1)'];
+          if (hasSst && hasChl) {
+            gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
+          } else if (hasChl) {
+            // クロロフィル単体の色を紫〜ピンク〜赤に変更
+            gradient = [
+              'rgba(123, 31, 162, 0)',
+              'rgba(123, 31, 162, 1)',
+              'rgba(233, 30, 99, 1)',
+              'rgba(255, 23, 68, 1)'
+            ];
+          }
         }
+
 
         heatmapLayerRef.current.setData(heatPoints);
         heatmapLayerRef.current.setOptions({ 
