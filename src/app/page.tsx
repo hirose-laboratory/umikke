@@ -317,7 +317,7 @@ export default function HeatmapPage() {
         const heatPoints = todayPoints.map((p) => {
           let weightValue = 0;
           const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
-          const chlVal = Number((p as any).chl ?? 0) * 10;
+          const chlVal = Number((p as any).chl ?? (p as any).cha ?? 0) * 25;
 
           if (hasSst && hasChl) weightValue = sstVal + chlVal;
           else if (hasSst) weightValue = sstVal;
