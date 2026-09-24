@@ -816,7 +816,7 @@ export default function HeatmapPage() {
           <RightSidebar
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
-            activeMarineLayers={activeMarineLayers} setActiveMarineLayers={setActiveMarineLayers}
+            activeMarineLayers={activeMarineLayers} setActiveMarineLayers={handleMarineLayersUpdate}
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
             isLoggedIn={isLoggedIn}
           />
