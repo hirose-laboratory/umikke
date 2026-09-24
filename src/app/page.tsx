@@ -137,6 +137,21 @@ export default function HeatmapPage() {
     setIsMounted(true);
   }, []);
 
+
+  // 水温とクロロフィルを切り替え式にするフィルター
+  const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
+    setActiveMarineLayers((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      
+      if (next.includes('sst') && next.includes('chl')) {
+        if (prev.includes('sst')) return next.filter((l) => l !== 'sst');
+        if (prev.includes('chl')) return next.filter((l) => l !== 'chl');
+      }
+      return next;
+    });
+  }, []);
+
+
   // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
