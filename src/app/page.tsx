@@ -428,32 +428,30 @@ export default function HeatmapPage() {
         const allFishPoints = fishPointsRef.current;
         
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
-          if (fishName === 'マダイ') return 1;
+          if (fishName === 'カタクチイワシ') return 1;
           if (fishName === 'ブリ') return 2;
           if (fishName === '伊勢エビ') return 3;
           return 0;
         });
 
-        const targetFishPoints = allFishPoints.filter((p: any) => {
-          // 1. 魚種IDの一致確認
-          const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-          const isFishMatch = selectedFishIds.some(id => id === currentFishId);
-          if (!isFishMatch) return false;
+    const targetFishPoints = allFishPoints.filter((p: any) => {
+        // 魚種IDの判定
+        const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+        const isFishMatch = selectedFishIds.some(id => id === currentFishId);
+        if (!isFishMatch) return false;
 
-          // 2. タイムスタンプを取得
-          const timeString = p?.target_timestamp ?? p?.sample_timestamp ?? p?.record_timestamp;
-          if (!timeString) return true; // 日時情報がない場合は魚種一致のみで通過
+        // eDNA_Prediction の日時カラム (target_timestamp) を取得
+       const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
+       if (!timeString) return true;
 
-          // 3. 選択中の日付（targetYear, targetMonth, targetDateNum）と一致するか判定
-          const pDate = new Date(timeString);
-          console.log(`🗺️ データの日付: ${pDate.getFullYear()}-${pDate.getMonth() + 1}-${pDate.getDate()} | 選択中の日付: ${targetYear}-${targetMonth + 1}-${targetDateNum}`);
-          return (
-            pDate.getFullYear() === targetYear &&
-            pDate.getMonth() === targetMonth &&
-            pDate.getDate() === targetDateNum
-          );
-        });
-
+  // 選択中の日付と一致するか判定
+  const pDate = new Date(timeString);
+  return (
+    pDate.getFullYear() === targetYear &&
+    pDate.getMonth() === targetMonth &&
+    pDate.getDate() === targetDateNum
+  );
+});
         console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
 
         const fishHeatData = targetFishPoints.map((p: any) => {
@@ -537,7 +535,7 @@ export default function HeatmapPage() {
       }
 
       const fishIds: number[] = activeFishLayers.map((name) => {
-        if (name === 'マダイ') return 1;
+        if (name === 'カタクチイワシ') return 1;
         if (name === 'ブリ') return 2;
         if (name === '伊勢エビ') return 3;
         return 0;
@@ -552,7 +550,7 @@ export default function HeatmapPage() {
 
       try {
         const requests = fishIds.map((id) => {
-          const url = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
+          const url = `${API_BASE_URL}/fish/${id}/prediction?date=${targetDateStr}`;
           console.log(`➡️ fetch実行: ${url}`);
           return fetch(url).then((res) => {
             if (!res.ok) throw new Error(`Status ${res.status}`);
