@@ -501,6 +501,9 @@ export default function HeatmapPage() {
   
   // 海上状況データ（OceanData）を取得
   useEffect(() => {
+    // 起動時のログ
+    console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
+
     let cancelled = false;
     async function fetchOceanData() {
       try {
@@ -511,16 +514,29 @@ export default function HeatmapPage() {
         const start = `${year}-${month}-${day}T00:00:00`;
         const end = `${year}-${month}-${day}T23:59:59`;
 
-        const res = await fetch(
-          `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-        );
+        const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        
+        // リクエスト前のログ
+        console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
+        console.log(`➡️ fetch実行: ${url}`);
+
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
+        
         const data: OceanDataPoint[] = await res.json();
         if (cancelled) return;
+        
         oceanPointsRef.current = data;
         setOceanPointCount(data.length);
         setOceanDataVersion((v) => v + 1);
+
+        // 成功時のログ
+        console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`, data);
+
       } catch (err) {
+        // エラー時のログ
+        console.error('❌ 海上状況データの取得に失敗しました:', err);
+        
         if (!cancelled) {
           const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
           setOceanError(message);
