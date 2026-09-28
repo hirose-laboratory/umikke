@@ -326,7 +326,9 @@ export default function HeatmapPage() {
 
     const todayPoints = allPoints.filter((p) => {
       if (!p.record_timestamp) return false;
-      const pDate = new Date(p.record_timestamp);
+      // 💡修正1: Safari/iOS等でエラーにならないようスペースを'T'に置換してパース
+      const safeTimestamp = p.record_timestamp.replace(' ', 'T');
+      const pDate = new Date(safeTimestamp);
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
@@ -346,7 +348,8 @@ export default function HeatmapPage() {
           else if (hasChl) weightValue = chlVal;
 
           return {
-            location: new google.maps.LatLng(p.latitude, p.longitude),
+            // 💡修正2: 緯度経度をNumber型で確実にキャスト
+            location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
             weight: weightValue,
           };
         });
@@ -366,14 +369,17 @@ export default function HeatmapPage() {
               'rgba(233, 30, 99, 1)',
               'rgba(255, 23, 68, 1)'
             ];
+          } else {
+            // 💡修正3: デフォルトの水温(SST)単体時のグラデーション設定
+            gradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
           }
         }
 
         heatmapLayerRef.current.setData(heatPoints);
-        // ✨ グラデーション調整: radiusを45から20へ下げ、maxIntensityを上げる
+        // 💡修正4: 水温単体の時はmaxIntensityを15付近に下げ、薄くなりすぎないように調整
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: hasChl ? 40 : 30, 
-          radius: 20, 
+          maxIntensity: hasChl ? 40 : 15, 
+          radius: 25, 
           gradient: gradient
         });
       } else {
@@ -450,15 +456,14 @@ export default function HeatmapPage() {
           const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
           if (!timeString) return true;
 
-          const pDate = new Date(timeString);
+          const safeTimeStr = timeString.replace(' ', 'T');
+          const pDate = new Date(safeTimeStr);
           return (
             pDate.getFullYear() === targetYear &&
             pDate.getMonth() === targetMonth &&
             pDate.getDate() === targetDateNum
           );
         });
-
-        console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
 
         const fishHeatData = targetFishPoints.map((p: any) => {
           const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 1);
@@ -481,7 +486,6 @@ export default function HeatmapPage() {
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
-        // ✨ 魚種ヒートマップグラデーション調整: radiusを25にし、maxIntensityを100にする
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
           radius: 25, 
@@ -493,6 +497,7 @@ export default function HeatmapPage() {
     }
   }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme]);
 
+  
   useEffect(() => {
     if (!mapReady) return;
     updateMapLayers();
