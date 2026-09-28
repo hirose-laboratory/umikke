@@ -104,7 +104,7 @@ export default function RightSidebar({
 
         {showFishPanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {['マダイ', 'ブリ', '伊勢エビ'].map((fish) => (
+            {['カタクチイワシ', 'ブリ', '伊勢エビ'].map((fish) => (
               <label key={fish} className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
                 <input type="checkbox" checked={activeFishLayers.includes(fish)} onChange={() => toggleFishLayer(fish)} style={{ width: '32px', height: '32px', cursor: 'pointer', accentColor: '#8e24aa' }} /> {fish}
               </label>

@@ -550,7 +550,7 @@ export default function HeatmapPage() {
 
       try {
         const requests = fishIds.map((id) => {
-          const url = `${API_BASE_URL}/fish/${id}/prediction?date=${targetDateStr}`;
+          const url = `${API_BASE_URL}/fish/${id}/predict?date=${targetDateStr}`;
           console.log(`➡️ fetch実行: ${url}`);
           return fetch(url).then((res) => {
             if (!res.ok) throw new Error(`Status ${res.status}`);
