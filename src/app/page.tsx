@@ -435,8 +435,22 @@ export default function HeatmapPage() {
         });
 
         const targetFishPoints = allFishPoints.filter((p: any) => {
+          // 1. 魚種IDの一致確認
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-          return selectedFishIds.some(id => id === currentFishId);
+          const isFishMatch = selectedFishIds.some(id => id === currentFishId);
+          if (!isFishMatch) return false;
+
+          // 2. タイムスタンプを取得
+          const timeString = p?.target_timestamp ?? p?.sample_timestamp ?? p?.record_timestamp;
+          if (!timeString) return true; // 日時情報がない場合は魚種一致のみで通過
+
+          // 3. 選択中の日付（targetYear, targetMonth, targetDateNum）と一致するか判定
+          const pDate = new Date(timeString);
+          return (
+            pDate.getFullYear() === targetYear &&
+            pDate.getMonth() === targetMonth &&
+            pDate.getDate() === targetDateNum
+          );
         });
 
         console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
