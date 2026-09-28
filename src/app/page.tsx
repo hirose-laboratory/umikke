@@ -369,12 +369,11 @@ export default function HeatmapPage() {
           }
         }
 
-        heatmapLayerRef.current.setData(heatPoints);
-        heatmapLayerRef.current.setOptions({ 
-          maxIntensity: hasChl ? 20 : 10,
-          radius: 45,
-          gradient: gradient
-        });
+      heatmapLayerRef.current.setOptions({ 
+      maxIntensity: hasChl ? 40 : 30, 
+      radius: 20, 
+      gradient: gradient
+      });
       } else {
         heatmapLayerRef.current.setData([]);
       }
@@ -481,10 +480,10 @@ export default function HeatmapPage() {
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
-          gradient: fishGradient,
-          radius: 50,
-          maxIntensity: 20,
-        });
+        gradient: fishGradient,
+        radius: 25, 
+        maxIntensity: 100, 
+      });
       } else {
         fishHeatmapLayerRef.current.setData([]);
       }
