@@ -378,7 +378,7 @@ export default function HeatmapPage() {
         heatmapLayerRef.current.setData(heatPoints);
         // 💡修正4: 水温単体の時はmaxIntensityを15付近に下げ、薄くなりすぎないように調整
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: hasChl ? 20 : 5, 
+          maxIntensity: hasChl ? 25 : 5, 
           radius: 50, 
           gradient: gradient
         });
