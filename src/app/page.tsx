@@ -441,10 +441,16 @@ export default function HeatmapPage() {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           const isFishMatch = selectedFishIds.some(id => id === currentFishId);
 
-          const timeString = p?.sample_timestamp ?? p?.target_timestamp;
+          const timeString = p?.target_timestamp ?? p?.sample_timestamp;
           if (!timeString) return false;
 
-          const pDate = new Date(timeString);
+          // "2026-10-06 12:00:00" のスペースを "T" に変換してどのブラウザでも確実にDate変換できるようにする
+          const formattedTimeString = typeof timeString === 'string' ? timeString.replace(' ', 'T') : timeString;
+          const pDate = new Date(formattedTimeString);
+
+          // 万が一、不正な日付データが入っていた場合は無視する
+          if (isNaN(pDate.getTime())) return false;
+
           return (
             isFishMatch &&
             pDate.getFullYear() === targetYear &&
@@ -454,10 +460,10 @@ export default function HeatmapPage() {
         });
 
         const fishHeatData = targetFishPoints.map((p: any) => {
-          const rawVal = Number(p?.concentration ?? p?.heatmap_value ?? 1);
+          const rawVal = Number(p?.heatmap_value ?? 0);
           return {
             location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-            weight: Math.max(1, rawVal),
+            weight: rawVal * 100, 
           };
         });
 
@@ -474,7 +480,7 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
           radius: 40,
-          maxIntensity: 1000
+          maxIntensity: 100
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
