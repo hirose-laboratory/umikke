@@ -513,14 +513,26 @@ export default function HeatmapPage() {
           );
         });
 
+        // 1. その日のデータから最小値と最大値を取得してレンジを計算
+        const fishValues = targetFishPoints
+          .map((p: any) => Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 0))
+          .filter((v: number) => !isNaN(v) && v > 0);
+
+        const minFishVal = fishValues.length > 0 ? Math.min(...fishValues) : 0;
+        const maxFishVal = fishValues.length > 0 ? Math.max(...fishValues) : 1;
+        const fishValRange = maxFishVal - minFishVal;
+
         const fishHeatData = targetFishPoints.map((p: any) => {
-          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 1);
+          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 0);
           const lat = Number(p?.latitude ?? p?.lat ?? 0);
           const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
+          // 2. 値を0〜100に正規化（自動スケーリング）
+          const normalizedWeight = fishValRange > 0 ? ((rawVal - minFishVal) / fishValRange) * 100 : 50;
+
           return {
             location: new google.maps.LatLng(lat, lng),
-            weight: rawVal > 0 ? rawVal * 10 : 10,
+            weight: normalizedWeight,
           };
         });
 
