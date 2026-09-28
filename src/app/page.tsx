@@ -436,7 +436,7 @@ export default function HeatmapPage() {
           if (fishName === '伊勢エビ') return 3;
           return 0;
         });
-
+/*
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           const isFishMatch = selectedFishIds.some(id => id === currentFishId);
@@ -454,6 +454,14 @@ export default function HeatmapPage() {
           const calendarDateStr = `${targetYear}-${monthStr}-${dayStr}`;
 
           return isFishMatch && dbDateStr === calendarDateStr;
+        });
+*/
+        const targetFishPoints = allFishPoints.filter((p: any) => {
+        const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+        const isFishMatch = selectedFishIds.some(id => id === currentFishId);
+  
+        // 原因特定の調査用：日付が合わなくても、魚種が合致していれば全て地図に表示させる
+        return isFishMatch; 
         });
 
         const fishHeatData = targetFishPoints.map((p: any) => {
