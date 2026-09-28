@@ -561,6 +561,7 @@ export default function HeatmapPage() {
 
         const results = await Promise.all(requests);
         fishPointsRef.current = results.flat();
+        console.log("バックエンドから取得したデータ:", fishPointsRef.current);
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('eDNAデータの取得に失敗しました:', err);
