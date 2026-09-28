@@ -369,11 +369,13 @@ export default function HeatmapPage() {
           }
         }
 
-      heatmapLayerRef.current.setOptions({ 
-      maxIntensity: hasChl ? 20 : 10, 
-      radius: 45, 
-      gradient: gradient
-      });
+        heatmapLayerRef.current.setData(heatPoints);
+        // ✨ グラデーション調整: radiusを45から20へ下げ、maxIntensityを上げる
+        heatmapLayerRef.current.setOptions({ 
+          maxIntensity: hasChl ? 40 : 30, 
+          radius: 20, 
+          gradient: gradient
+        });
       } else {
         heatmapLayerRef.current.setData([]);
       }
@@ -393,8 +395,8 @@ export default function HeatmapPage() {
         const maxSpeed = Math.max(...validSpeeds);
         const speedRange = maxSpeed - minSpeed;
 
-        const MIN_ARROW_LENGTH = 8;
-        const MAX_ARROW_LENGTH = 36;
+        const MIN_ARROW_LENGTH = 5;
+        const MAX_ARROW_LENGTH = 20;
 
         todayPoints.forEach(p => {
           const speed = Number(p.current_speed ?? 0);
@@ -407,18 +409,18 @@ export default function HeatmapPage() {
               arrowLength = MIN_ARROW_LENGTH + (normalizedRatio * (MAX_ARROW_LENGTH - MIN_ARROW_LENGTH));
             }
 
-            const arrowWidth = 5 + ((speed - minSpeed) / (speedRange || 1)) * 3;
-            const customArrowPath = `M 0,-${arrowLength} L ${arrowWidth},6 L 0,2 L -${arrowWidth},6 Z`;
+            const arrowWidth = 4 + ((speed - minSpeed) / (speedRange || 1)) * 2;
+            const customArrowPath = `M 0,-${arrowLength} L ${arrowWidth},5 L 0,2 L -${arrowWidth},5 Z`;
 
             const arrowMarker = new google.maps.Marker({
               position: { lat: Number(p.latitude), lng: Number(p.longitude) },
               map: mapInstanceRef.current,
               icon: {
                 path: customArrowPath,
-                scale: 1.2,
+                scale: 0.9,
                 rotation: direction,
                 fillColor: '#FF0000',
-                fillOpacity: 1.0,
+                fillOpacity: 0.9,
                 strokeColor: 'white',
                 strokeWeight: 1
               },
@@ -479,11 +481,12 @@ export default function HeatmapPage() {
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
+        // ✨ 魚種ヒートマップグラデーション調整: radiusを25にし、maxIntensityを100にする
         fishHeatmapLayerRef.current.setOptions({
-        gradient: fishGradient,
-        radius: 50, 
-        maxIntensity: 20, 
-      });
+          gradient: fishGradient,
+          radius: 25, 
+          maxIntensity: 100, 
+        });
       } else {
         fishHeatmapLayerRef.current.setData([]);
       }
@@ -501,7 +504,7 @@ export default function HeatmapPage() {
   
   // 海上状況データ（OceanData）を取得
   useEffect(() => {
-    // 起動時のログ
+    // 🟢 起動時ログ
     console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
 
     let cancelled = false;
@@ -516,7 +519,7 @@ export default function HeatmapPage() {
 
         const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
         
-        // リクエスト前のログ
+        // 🔵 リクエスト前ログ
         console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
         console.log(`➡️ fetch実行: ${url}`);
 
@@ -530,11 +533,11 @@ export default function HeatmapPage() {
         setOceanPointCount(data.length);
         setOceanDataVersion((v) => v + 1);
 
-        // 成功時のログ
+        // ✅ 成功ログ
         console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`, data);
 
       } catch (err) {
-        // エラー時のログ
+        // ❌ エラーログ
         console.error('❌ 海上状況データの取得に失敗しました:', err);
         
         if (!cancelled) {
@@ -552,6 +555,7 @@ export default function HeatmapPage() {
 
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
+  
 
   // 魚種(eDNA)データ取得 (1, 2, 3 の個別IDでリクエスト)
   useEffect(() => {
@@ -645,11 +649,11 @@ export default function HeatmapPage() {
 
       const customGradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
       heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [], map: map, gradient: customGradient, radius: 15, opacity: 0.85
+        data: [], map: map, gradient: customGradient, radius: 20, opacity: 0.85
       });
 
       fishHeatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [], map: map, radius: 40, opacity: 0.85
+        data: [], map: map, radius: 25, opacity: 0.85
       });
       
       infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
