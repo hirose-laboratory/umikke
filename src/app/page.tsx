@@ -378,8 +378,8 @@ export default function HeatmapPage() {
         heatmapLayerRef.current.setData(heatPoints);
         // 💡修正4: 水温単体の時はmaxIntensityを15付近に下げ、薄くなりすぎないように調整
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: hasChl ? 40 : 15, 
-          radius: 25, 
+          maxIntensity: hasChl ? 30 : 5, 
+          radius: 40, 
           gradient: gradient
         });
       } else {
@@ -497,7 +497,7 @@ export default function HeatmapPage() {
     }
   }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme]);
 
-  
+
   useEffect(() => {
     if (!mapReady) return;
     updateMapLayers();
