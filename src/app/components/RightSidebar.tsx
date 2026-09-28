@@ -82,14 +82,14 @@ export default function RightSidebar({
       {/* 2. 魚種分布パネル (マダイ / ブリ / 伊勢エビ) */}
       <div className="layer-container" style={{ position: 'relative', background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        {/* 未ログイン時ブロックオーバーレイ */}
-        {!isLoggedIn && (
+        {/* 未ログイン時ブロックオーバーレイ（一時無効化） */}
+        {/* {!isLoggedIn && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '16px 28px', borderRadius: '40px', fontSize: '26px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span>🔒 ログインして機能を開放</span>
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
