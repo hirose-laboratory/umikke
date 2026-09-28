@@ -371,7 +371,7 @@ export default function HeatmapPage() {
 
       heatmapLayerRef.current.setOptions({ 
       maxIntensity: hasChl ? 20 : 10, 
-      radius: 20, 
+      radius: 45, 
       gradient: gradient
       });
       } else {
@@ -482,7 +482,7 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setOptions({
         gradient: fishGradient,
         radius: 50, 
-        maxIntensity: 100, 
+        maxIntensity: 20, 
       });
       } else {
         fishHeatmapLayerRef.current.setData([]);
