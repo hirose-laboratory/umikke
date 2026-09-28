@@ -444,19 +444,16 @@ export default function HeatmapPage() {
           const timeString = p?.target_timestamp ?? p?.sample_timestamp;
           if (!timeString) return false;
 
-          // "2026-10-06 12:00:00" のスペースを "T" に変換してどのブラウザでも確実にDate変換できるようにする
-          const formattedTimeString = typeof timeString === 'string' ? timeString.replace(' ', 'T') : timeString;
-          const pDate = new Date(formattedTimeString);
+          // DBの "2026-10-06 12:00:00" や "2026-10-06T12:00:00" から日付部分 "2026-10-06" だけを安全に抽出
+          const dbDateStr = typeof timeString === 'string' 
+            ? timeString.split(' ')[0].split('T')[0] 
+            : new Date(timeString).toISOString().split('T')[0];
 
-          // 万が一、不正な日付データが入っていた場合は無視する
-          if (isNaN(pDate.getTime())) return false;
+          const monthStr = String(targetMonth + 1).padStart(2, '0'); 
+          const dayStr = String(targetDateNum).padStart(2, '0');
+          const calendarDateStr = `${targetYear}-${monthStr}-${dayStr}`;
 
-          return (
-            isFishMatch &&
-            pDate.getFullYear() === targetYear &&
-            pDate.getMonth() === targetMonth &&
-            pDate.getDate() === targetDateNum
-          );
+          return isFishMatch && dbDateStr === calendarDateStr;
         });
 
         const fishHeatData = targetFishPoints.map((p: any) => {
