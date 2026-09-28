@@ -437,7 +437,6 @@ export default function HeatmapPage() {
           }
         }
 
-        // 型エラーを完全に防ぐキャスト処理 (①・②)
         (heatmapLayerRef.current as any).setData(heatPoints);
         (heatmapLayerRef.current as any).setOptions({
           maxIntensity: 100,
@@ -445,7 +444,6 @@ export default function HeatmapPage() {
           gradient: gradient,
         });
       } else {
-        // (③)
         (heatmapLayerRef.current as any).setData([]);
       }
     }
@@ -501,7 +499,7 @@ export default function HeatmapPage() {
       }
     }
 
-    // 3. 魚種分布 (eDNA予測) ヒートマップ
+    // 3. 魚種分布 (eDNA予測) ヒートマップ - 自動スケール調整版
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
@@ -526,40 +524,55 @@ export default function HeatmapPage() {
           );
         });
 
-        const fishHeatData = targetFishPoints.map((p) => {
-          const rawVal = Number(p.heatmap_value ?? p.value ?? p.count ?? 1);
-          const lat = Number(p.latitude ?? p.lat ?? 0);
-          const lng = Number(p.longitude ?? p.lng ?? 0);
+        if (targetFishPoints.length > 0) {
+          // 選択日のデータの最小値・最大値を算出
+          const fishValues = targetFishPoints
+            .map((p) => Number(p.heatmap_value ?? p.value ?? p.count ?? 0))
+            .filter((v) => !isNaN(v));
 
-          return {
-            location: new google.maps.LatLng(lat, lng),
-            weight: rawVal > 0 ? rawVal * 10 : 10,
-          };
-        });
+          const minFishVal = fishValues.length > 0 ? Math.min(...fishValues) : 0;
+          const maxFishVal = fishValues.length > 0 ? Math.max(...fishValues) : 1;
+          const fishValRange = maxFishVal - minFishVal;
 
-        let fishGradient: string[];
-        if (fishTheme === 'rainbow') {
-          fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
-        } else if (fishTheme === 'colorblind') {
-          fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
+          const fishHeatData = targetFishPoints.map((p) => {
+            const rawVal = Number(p.heatmap_value ?? p.value ?? p.count ?? 0);
+            const lat = Number(p.latitude ?? p.lat ?? 0);
+            const lng = Number(p.longitude ?? p.lng ?? 0);
+
+            // 海況データ同様、0〜100 に自動調整（全点同じ値の場合は 50）
+            const normalizedWeight =
+              fishValRange > 0 ? ((rawVal - minFishVal) / fishValRange) * 100 : 50;
+
+            return {
+              location: new google.maps.LatLng(lat, lng),
+              weight: normalizedWeight,
+            };
+          });
+
+          let fishGradient: string[];
+          if (fishTheme === 'rainbow') {
+            fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+          } else if (fishTheme === 'colorblind') {
+            fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
+          } else {
+            fishGradient = [
+              'rgba(142, 36, 170, 0)',
+              'rgba(142, 36, 170, 1)',
+              'rgba(255, 152, 0, 1)',
+              'rgba(255, 235, 59, 1)',
+            ];
+          }
+
+          (fishHeatmapLayerRef.current as any).setData(fishHeatData);
+          (fishHeatmapLayerRef.current as any).setOptions({
+            gradient: fishGradient,
+            radius: 45, // 表示が見やすくなるよう半径を45に拡大
+            maxIntensity: 100,
+          });
         } else {
-          fishGradient = [
-            'rgba(142, 36, 170, 0)',
-            'rgba(142, 36, 170, 1)',
-            'rgba(255, 152, 0, 1)',
-            'rgba(255, 235, 59, 1)',
-          ];
+          (fishHeatmapLayerRef.current as any).setData([]);
         }
-
-        // 型エラーを完全に防ぐキャスト処理 (④・⑤)
-        (fishHeatmapLayerRef.current as any).setData(fishHeatData);
-        (fishHeatmapLayerRef.current as any).setOptions({
-          gradient: fishGradient,
-          radius: 25,
-          maxIntensity: 100,
-        });
       } else {
-        // (⑥)
         (fishHeatmapLayerRef.current as any).setData([]);
       }
     }
@@ -614,7 +627,6 @@ export default function HeatmapPage() {
     };
   }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
 
-  // 画像のAPI仕様に基づき、start/endパラメータで指定する形式に変更
   useEffect(() => {
     async function fetchFishData() {
       if (activeFishLayers.length === 0) {
