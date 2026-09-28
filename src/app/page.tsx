@@ -446,6 +446,7 @@ export default function HeatmapPage() {
 
           // 3. 選択中の日付（targetYear, targetMonth, targetDateNum）と一致するか判定
           const pDate = new Date(timeString);
+          console.log(`🗺️ データの日付: ${pDate.getFullYear()}-${pDate.getMonth() + 1}-${pDate.getDate()} | 選択中の日付: ${targetYear}-${targetMonth + 1}-${targetDateNum}`);
           return (
             pDate.getFullYear() === targetYear &&
             pDate.getMonth() === targetMonth &&
