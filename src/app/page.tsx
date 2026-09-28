@@ -573,19 +573,51 @@ export default function HeatmapPage() {
   }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   useEffect(() => {
-    async function fetchHotpoints() {
+    console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
+
+    async function fetchFishData() {
+      if (activeFishLayers.length === 0) {
+        console.log("🟡 魚種が選択されていないため、データ取得をスキップします");
+        fishPointsRef.current = [];
+        setOceanDataVersion((v) => v + 1);
+        return;
+      }
+
+      const fishIds: number[] = activeFishLayers.map((name) => {
+        if (name === 'マダイ') return 1;
+        if (name === 'ブリ') return 2;
+        if (name === '伊勢エビ') return 3;
+        return 0;
+      }).filter((id) => id > 0);
+
+      const year = selectedFullDate.getFullYear();
+      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedFullDate.getDate()).padStart(2, '0');
+      const targetDateStr = `${year}-${month}-${day}`;
+
+      console.log(`🔵 APIにリクエストを送ります: 魚種IDs=[${fishIds}], 日付=${targetDateStr}`);
+
       try {
-        const res = await fetch(`${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=20`);
-        if (res.ok) {
-          const data = await res.json();
-          setHotpoints(data);
-        }
+        const requests = fishIds.map((id) => {
+          const url = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
+          console.log(`➡️ fetch実行: ${url}`);
+          return fetch(url).then((res) => {
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            return res.json();
+          });
+        });
+
+        const results = await Promise.all(requests);
+        fishPointsRef.current = results.flat();
+        console.log("✅ バックエンドからデータ取得成功！:", fishPointsRef.current);
+        setOceanDataVersion((v) => v + 1);
       } catch (err) {
-        console.error('サジェスト取得エラー', err);
+        console.error('❌ eDNAデータの取得に失敗しました:', err);
       }
     }
-    fetchHotpoints();
-  }, [API_BASE_URL]);
+
+    fetchFishData();
+  }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   // ==========================================
   // 10. Google Maps 初期化 ＆ イベント初期設定
