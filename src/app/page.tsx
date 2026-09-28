@@ -332,7 +332,7 @@ export default function HeatmapPage() {
         const heatPoints = todayPoints.map((p) => {
           let weightValue = 0;
           const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
-          const chlVal = Number((p as any).chl ?? (p as any).cha ?? 0) * 10;
+          const chlVal = Number((p as any).chl ?? (p as any).cha ?? 0) * 5;
 
           if (hasSst && hasChl) weightValue = sstVal + chlVal;
           else if (hasSst) weightValue = sstVal;
@@ -365,7 +365,7 @@ export default function HeatmapPage() {
 
         heatmapLayerRef.current.setData(heatPoints);
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: 10, 
+          maxIntensity: hasChl ? 20 : 10,
           radius: 45,
           gradient: gradient
         });
