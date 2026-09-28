@@ -536,9 +536,16 @@ export default function HeatmapPage() {
         return 0;
       }).filter((id) => id > 0);
 
+      // カレンダーで選ばれている日付（selectedFullDate）を YYYY-MM-DD 形式に変換
+      const year = selectedFullDate.getFullYear();
+      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedFullDate.getDate()).padStart(2, '0');
+      const targetDateStr = `${year}-${month}-${day}`;
+
       try {
         const requests = fishIds.map((id) =>
-          fetch(`${API_BASE_URL}/fish/${id}/edna`).then((res) => {
+          // URLの最後に ?date=YYYY-MM-DD を追加して、その日のデータだけを要求する
+          fetch(`${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`).then((res) => {
             if (!res.ok) throw new Error(`Status ${res.status}`);
             return res.json();
           })
@@ -553,7 +560,8 @@ export default function HeatmapPage() {
     }
 
     fetchFishData();
-  }, [API_BASE_URL, activeFishLayers]);
+  // 依存配列に selectedFullDate を追加することで、カレンダーを変えるたびにこの処理が走るようになる
+  }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   useEffect(() => {
     async function fetchHotpoints() {
