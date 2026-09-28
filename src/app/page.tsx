@@ -326,7 +326,6 @@ export default function HeatmapPage() {
 
     const todayPoints = allPoints.filter((p) => {
       if (!p.record_timestamp) return false;
-      // 💡修正1: Safari/iOS等でエラーにならないようスペースを'T'に置換してパース
       const safeTimestamp = p.record_timestamp.replace(' ', 'T');
       const pDate = new Date(safeTimestamp);
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
@@ -337,23 +336,64 @@ export default function HeatmapPage() {
       const hasSst = activeMarineLayers.includes('sst');
       const hasChl = activeMarineLayers.includes('chl');
 
-      if (hasSst || hasChl) {
-        const heatPoints = todayPoints.map((p) => {
-          let weightValue = 0;
-          const sstVal = Math.max(0, Number(p.sst ?? 15) - 15);
-          const chlVal = Number((p as any).chl ?? (p as any).cha ?? 0) * 4;
+      if ((hasSst || hasChl) && todayPoints.length > 0) {
+        // ----------------------------------------------------
+        // 1. 本日データの最小値 (min) ・ 最大値 (max) を抽出
+        // ----------------------------------------------------
+        const sstValues = todayPoints
+          .map((p) => (p.sst !== null && p.sst !== undefined ? Number(p.sst) : null))
+          .filter((v): v is number => v !== null && !isNaN(v));
 
-          if (hasSst && hasChl) weightValue = sstVal + chlVal;
-          else if (hasSst) weightValue = sstVal;
-          else if (hasChl) weightValue = chlVal;
+        const chlValues = todayPoints
+          .map((p) => {
+            const raw = (p as any).chl ?? (p as any).cha;
+            return raw !== null && raw !== undefined ? Number(raw) : null;
+          })
+          .filter((v): v is number => v !== null && !isNaN(v));
+
+        const minSst = sstValues.length > 0 ? Math.min(...sstValues) : 0;
+        const maxSst = sstValues.length > 0 ? Math.max(...sstValues) : 0;
+        const sstRange = maxSst - minSst;
+
+        const minChl = chlValues.length > 0 ? Math.min(...chlValues) : 0;
+        const maxChl = chlValues.length > 0 ? Math.max(...chlValues) : 0;
+        const chlRange = maxChl - minChl;
+
+        // ----------------------------------------------------
+        // 2. 最小〜最大の中で 0〜100 に動的スケール変換 (weight計算)
+        // ----------------------------------------------------
+        const heatPoints = todayPoints.map((p) => {
+          let normalizedSst = 0;
+          let normalizedChl = 0;
+
+          if (hasSst && p.sst !== null && p.sst !== undefined) {
+            const val = Number(p.sst);
+            // 範囲差がある場合は 0〜100 に換算（範囲がない場合は中央値50）
+            normalizedSst = sstRange > 0 ? ((val - minSst) / sstRange) * 100 : 50;
+          }
+
+          if (hasChl) {
+            const rawChl = (p as any).chl ?? (p as any).cha;
+            if (rawChl !== null && rawChl !== undefined) {
+              const val = Number(rawChl);
+              normalizedChl = chlRange > 0 ? ((val - minChl) / chlRange) * 100 : 50;
+            }
+          }
+
+          let weightValue = 0;
+          if (hasSst && hasChl) weightValue = (normalizedSst + normalizedChl) / 2;
+          else if (hasSst) weightValue = normalizedSst;
+          else if (hasChl) weightValue = normalizedChl;
 
           return {
-            // 💡修正2: 緯度経度をNumber型で確実にキャスト
             location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
             weight: weightValue,
           };
         });
 
+        // ----------------------------------------------------
+        // 3. テーマごとのグラデーション定義
+        // ----------------------------------------------------
         let gradient = null;
         if (marineTheme === 'rainbow') {
           gradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
@@ -370,16 +410,26 @@ export default function HeatmapPage() {
               'rgba(255, 23, 68, 1)'
             ];
           } else {
-            // 💡修正3: デフォルトの水温(SST)単体時のグラデーション設定
-            gradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
+            gradient = [
+              'rgba(0, 0, 0, 0)',
+              'rgba(0, 0, 255, 1.0)',
+              'rgba(0, 255, 255, 1.0)',
+              'rgba(0, 255, 0, 1.0)',
+              'rgba(255, 255, 0, 1.0)',
+              'rgba(255, 165, 0, 1.0)',
+              'rgba(255, 0, 0, 1.0)'
+            ];
           }
         }
 
         heatmapLayerRef.current.setData(heatPoints);
-        // 💡修正4: 水温単体の時はmaxIntensityを15付近に下げ、薄くなりすぎないように調整
+        
+        // ----------------------------------------------------
+        // 4. 表示オプション設定
+        // ----------------------------------------------------
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: hasChl ? 25 : 5, 
-          radius: 50, 
+          maxIntensity: 100, // 0〜100に規格化しているため100固定で常にフルスケール表示
+          radius: 45,        // 点同士が太く綺麗につながるサイズ
           gradient: gradient
         });
       } else {
@@ -442,8 +492,6 @@ export default function HeatmapPage() {
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
-        
-        // 各魚種名からそれぞれの正確な ID を取得
         const selectedFishIds: number[] = Array.from(
           new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
         );
