@@ -456,13 +456,13 @@ export default function HeatmapPage() {
           return isFishMatch && dbDateStr === calendarDateStr;
         });
 */
-        const targetFishPoints = allFishPoints.filter((p: any) => {
-        const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-        const isFishMatch = selectedFishIds.some(id => id === currentFishId);
-  
-        // 原因特定の調査用：日付が合わなくても、魚種が合致していれば全て地図に表示させる
-        return isFishMatch; 
-        });
+      const targetFishPoints = allFishPoints.filter((p: any) => {
+      const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+      const isFishMatch = selectedFishIds.some(id => id === currentFishId);
+      
+      return isFishMatch; 
+    });
+    console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
 
         const fishHeatData = targetFishPoints.map((p: any) => {
           const rawVal = Number(p?.heatmap_value ?? 0);
