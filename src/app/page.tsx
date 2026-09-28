@@ -427,7 +427,7 @@ export default function HeatmapPage() {
 
     // 魚種分布 (eDNA予測) ヒートマップ
     if (fishHeatmapLayerRef.current) {
-      if (activeFishLayers.length > 0 && isLoggedIn) {
+      if (activeFishLayers.length > 0 ) {
         const allFishPoints = fishPointsRef.current;
         
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
@@ -812,8 +812,11 @@ export default function HeatmapPage() {
 
           {/* 右上アカウント・メニュー操作 */}
           <TopRightMenu
-            isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail} setShowWindyMenu={setShowWindyMenu}
-            setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
+            isLoggedIn={isLoggedIn} 
+            loggedInEmail={loggedInEmail} 
+            setShowWindyMenu={setShowWindyMenu}
+            setIsSignUp={setIsSignUp} 
+            setShowLoginModal={setShowLoginModal}
           />
 
           {/* 右側レイヤー選択サイドバー */}
@@ -822,7 +825,6 @@ export default function HeatmapPage() {
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={handleMarineLayersUpdate}
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
-            isLoggedIn={isLoggedIn}
           />
 
           {/* 左下動的凡例 (水温 / クロロフィル / 魚種濃度) */}
