@@ -74,6 +74,14 @@ interface Hotpoint {
   intensity_score?: number;
 }
 
+// 魚種名からバックエンドの固有ID(1, 2, 3...)へ変換する関数
+const getFishIdByName = (name: string): number => {
+  if (name.includes('マダイ') || name.includes('タイ')) return 2;
+  if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
+  if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
+  return 1; // デフォルトID
+};
+
 export default function HeatmapPage() {
   // ==========================================
   // 3. Google Maps オブジェクト参照 (Ref)
@@ -141,7 +149,6 @@ export default function HeatmapPage() {
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveMarineLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
-      
       if (next.includes('sst') && next.includes('chl')) {
         if (prev.includes('sst')) return next.filter((l) => l !== 'sst');
         if (prev.includes('chl')) return next.filter((l) => l !== 'chl');
@@ -185,7 +192,7 @@ export default function HeatmapPage() {
   }, [fishTheme]);
 
   // ==========================================
-  // 6. ユーザー認証機能 (ログイン / 登録 / 削除)
+  // 6. ユーザー認証機能
   // ==========================================
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
@@ -316,7 +323,9 @@ export default function HeatmapPage() {
     const targetYear = selectedFullDate.getFullYear();
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
+
     const todayPoints = allPoints.filter((p) => {
+      if (!p.record_timestamp) return false;
       const pDate = new Date(p.record_timestamp);
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
@@ -352,10 +361,10 @@ export default function HeatmapPage() {
             gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
           } else if (hasChl) {
             gradient = [
-              'rgba(123, 31, 162, 0)',   // #7b1fa2 (透明な紫)
-              'rgba(123, 31, 162, 1)',   // #7b1fa2 (紫)
-              'rgba(233, 30, 99, 1)',    // #e91e63 (ピンク)
-              'rgba(255, 23, 68, 1)'     // #ff1744 (赤)
+              'rgba(123, 31, 162, 0)',
+              'rgba(123, 31, 162, 1)',
+              'rgba(233, 30, 99, 1)',
+              'rgba(255, 23, 68, 1)'
             ];
           }
         }
@@ -427,31 +436,27 @@ export default function HeatmapPage() {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         
-        const selectedFishIds: number[] = activeFishLayers.map(fishName => {
-          if (fishName === 'カタクチイワシ') return 1;
-          if (fishName === 'ブリ') return 2;
-          if (fishName === '伊勢エビ') return 3;
-          return 0;
+        // 各魚種名からそれぞれの正確な ID を取得
+        const selectedFishIds: number[] = Array.from(
+          new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
+        );
+
+        const targetFishPoints = allFishPoints.filter((p: any) => {
+          const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+          const isFishMatch = selectedFishIds.includes(currentFishId);
+          if (!isFishMatch) return false;
+
+          const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
+          if (!timeString) return true;
+
+          const pDate = new Date(timeString);
+          return (
+            pDate.getFullYear() === targetYear &&
+            pDate.getMonth() === targetMonth &&
+            pDate.getDate() === targetDateNum
+          );
         });
 
-    const targetFishPoints = allFishPoints.filter((p: any) => {
-        // 魚種IDの判定
-        const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-        const isFishMatch = selectedFishIds.some(id => id === currentFishId);
-        if (!isFishMatch) return false;
-
-        // eDNA_Prediction の日時カラム (target_timestamp) を取得
-       const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
-       if (!timeString) return true;
-
-  // 選択中の日付と一致するか判定
-  const pDate = new Date(timeString);
-  return (
-    pDate.getFullYear() === targetYear &&
-    pDate.getMonth() === targetMonth &&
-    pDate.getDate() === targetDateNum
-  );
-});
         console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
 
         const fishHeatData = targetFishPoints.map((p: any) => {
@@ -492,20 +497,30 @@ export default function HeatmapPage() {
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
-  // 9. バックエンドAPI通信 (海況 / eDNA / サジェスト)
+  // 9. バックエンドAPI通信 (海況 / eDNA)
   // ==========================================
+  
+  // 海上状況データ（OceanData）を取得
   useEffect(() => {
     let cancelled = false;
     async function fetchOceanData() {
       try {
-        const start = '2026-05-01T00:00:00'; const end = '2026-05-31T23:59:59';
+        const year = selectedFullDate.getFullYear();
+        const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedFullDate.getDate()).padStart(2, '0');
+        
+        const start = `${year}-${month}-${day}T00:00:00`;
+        const end = `${year}-${month}-${day}T23:59:59`;
+
         const res = await fetch(
           `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
         );
         if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
         const data: OceanDataPoint[] = await res.json();
         if (cancelled) return;
-        oceanPointsRef.current = data; setOceanPointCount(data.length); setOceanDataVersion((v) => v + 1);
+        oceanPointsRef.current = data;
+        setOceanPointCount(data.length);
+        setOceanDataVersion((v) => v + 1);
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
@@ -515,14 +530,15 @@ export default function HeatmapPage() {
         if (!cancelled) setOceanLoading(false);
       }
     }
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setOceanLoading(true); setOceanError(null);
-      fetchOceanData();
-    });
-    return () => { cancelled = true; };
-  }, [oceanRetryKey, API_BASE_URL]);
 
+    setOceanLoading(true);
+    setOceanError(null);
+    fetchOceanData();
+
+    return () => { cancelled = true; };
+  }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
+
+  // 魚種(eDNA)データ取得 (1, 2, 3 の個別IDでリクエスト)
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
 
@@ -534,23 +550,21 @@ export default function HeatmapPage() {
         return;
       }
 
-      const fishIds: number[] = activeFishLayers.map((name) => {
-        if (name === 'カタクチイワシ') return 1;
-        if (name === 'ブリ') return 2;
-        if (name === '伊勢エビ') return 3;
-        return 0;
-      }).filter((id) => id > 0);
+      // 選択された魚種からそれぞれの正確な固有ID（重複除去）を取得
+      const fishIds: number[] = Array.from(
+        new Set(activeFishLayers.map((name) => getFishIdByName(name)))
+      );
 
       const year = selectedFullDate.getFullYear();
       const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
       const targetDateStr = `${year}-${month}-${day}`;
 
-      console.log(`🔵 APIにリクエストを送ります: 魚種IDs=[${fishIds}], 日付=${targetDateStr}`);
+      console.log(`🔵 APIにリクエストを送ります: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
 
       try {
         const requests = fishIds.map((id) => {
-          const url = `${API_BASE_URL}/fish/${id}/predict?date=${targetDateStr}`;
+          const url = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
           console.log(`➡️ fetch実行: ${url}`);
           return fetch(url).then((res) => {
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -571,7 +585,7 @@ export default function HeatmapPage() {
   }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   // ==========================================
-  // 10. Google Maps 初期化 ＆ イベント初期設定
+  // 10. Google Maps 初期化 ＆ イベント設定
   // ==========================================
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -625,7 +639,6 @@ export default function HeatmapPage() {
       
       infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
-      // 地図クリック時：最寄りの海洋観測データの詳細ポップアップを表示
       map.addListener('click', (e: any) => {
         const clickLat = e.latLng.lat();
         const clickLng = e.latLng.lng();
@@ -770,7 +783,7 @@ export default function HeatmapPage() {
   if (!isMounted) return null;
 
   // ==========================================
-  // 12. 画面UI描画 (JSX / レイアウト)
+  // 12. 画面UI描画 (JSX)
   // ==========================================
   return (
     <>
@@ -830,7 +843,7 @@ export default function HeatmapPage() {
             activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
           />
 
-          {/* 左下動的凡例 (水温 / クロロフィル / 魚種濃度) */}
+          {/* 左下動的凡例 */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
             {activeMarineLayers.includes('sst') && (
               <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
@@ -886,7 +899,7 @@ export default function HeatmapPage() {
             calendarCells={calendarCells} getCalendarDayStatus={getCalendarDayStatus} setBaseDate={setBaseDate} formattedSelectedDate={formattedSelectedDate}
           />
 
-          {/* 右下マップ操作ボタン (ズーム・現在地) */}
+          {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
 
           {/* ログイン・新規登録モーダル */}
