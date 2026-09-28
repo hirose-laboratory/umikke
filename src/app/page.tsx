@@ -137,7 +137,6 @@ export default function HeatmapPage() {
     setIsMounted(true);
   }, []);
 
-
   // 水温とクロロフィルを切り替え式にするフィルター
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveMarineLayers((prev) => {
@@ -150,7 +149,6 @@ export default function HeatmapPage() {
       return next;
     });
   }, []);
-
 
   // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
@@ -362,7 +360,6 @@ export default function HeatmapPage() {
           }
         }
 
-
         heatmapLayerRef.current.setData(heatPoints);
         heatmapLayerRef.current.setOptions({ 
           maxIntensity: hasChl ? 20 : 10,
@@ -427,7 +424,7 @@ export default function HeatmapPage() {
 
     // 魚種分布 (eDNA予測) ヒートマップ
     if (fishHeatmapLayerRef.current) {
-      if (activeFishLayers.length > 0 ) {
+      if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         
         const selectedFishIds: number[] = activeFishLayers.map(fishName => {
@@ -436,43 +433,26 @@ export default function HeatmapPage() {
           if (fishName === '伊勢エビ') return 3;
           return 0;
         });
-/*
+
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-          const isFishMatch = selectedFishIds.some(id => id === currentFishId);
-
-          const timeString = p?.target_timestamp ?? p?.sample_timestamp;
-          if (!timeString) return false;
-
-          // DBの "2026-10-06 12:00:00" や "2026-10-06T12:00:00" から日付部分 "2026-10-06" だけを安全に抽出
-          const dbDateStr = typeof timeString === 'string' 
-            ? timeString.split(' ')[0].split('T')[0] 
-            : new Date(timeString).toISOString().split('T')[0];
-
-          const monthStr = String(targetMonth + 1).padStart(2, '0'); 
-          const dayStr = String(targetDateNum).padStart(2, '0');
-          const calendarDateStr = `${targetYear}-${monthStr}-${dayStr}`;
-
-          return isFishMatch && dbDateStr === calendarDateStr;
+          return selectedFishIds.some(id => id === currentFishId);
         });
-*/
-      const targetFishPoints = allFishPoints.filter((p: any) => {
-      const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-      const isFishMatch = selectedFishIds.some(id => id === currentFishId);
-      
-      return isFishMatch; 
-    });
-    console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
+
+        console.log("🗺️ 地図に渡す直前のデータ:", targetFishPoints);
 
         const fishHeatData = targetFishPoints.map((p: any) => {
-          const rawVal = Number(p?.heatmap_value ?? 0);
+          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 1);
+          const lat = Number(p?.latitude ?? p?.lat ?? 0);
+          const lng = Number(p?.longitude ?? p?.lng ?? 0);
+
           return {
-            location: new google.maps.LatLng(Number(p.latitude), Number(p.longitude)),
-            weight: rawVal * 100, 
+            location: new google.maps.LatLng(lat, lng),
+            weight: rawVal > 0 ? rawVal * 10 : 10,
           };
         });
 
-        let fishGradient;
+        let fishGradient: string[];
         if (fishTheme === 'rainbow') {
           fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
         } else if (fishTheme === 'colorblind') {
@@ -484,17 +464,18 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 40,
-          maxIntensity: 100
+          radius: 50,
+          maxIntensity: 20,
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
       }
     }
-  }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme, isLoggedIn]);
-  
+  }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme]);
+
   useEffect(() => {
-    if (!mapReady) return; updateMapLayers();
+    if (!mapReady) return;
+    updateMapLayers();
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
@@ -528,49 +509,6 @@ export default function HeatmapPage() {
     });
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL]);
-
-  useEffect(() => {
-    async function fetchFishData() {
-      if (activeFishLayers.length === 0) {
-        fishPointsRef.current = [];
-        setOceanDataVersion((v) => v + 1);
-        return;
-      }
-
-      const fishIds: number[] = activeFishLayers.map((name) => {
-        if (name === 'マダイ') return 1;
-        if (name === 'ブリ') return 2;
-        if (name === '伊勢エビ') return 3;
-        return 0;
-      }).filter((id) => id > 0);
-
-      // カレンダーで選ばれている日付（selectedFullDate）を YYYY-MM-DD 形式に変換
-      const year = selectedFullDate.getFullYear();
-      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedFullDate.getDate()).padStart(2, '0');
-      const targetDateStr = `${year}-${month}-${day}`;
-
-      try {
-        const requests = fishIds.map((id) =>
-          // URLの最後に ?date=YYYY-MM-DD を追加して、その日のデータだけを要求する
-          fetch(`${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`).then((res) => {
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-            return res.json();
-          })
-        );
-
-        const results = await Promise.all(requests);
-        fishPointsRef.current = results.flat();
-        console.log("バックエンドから取得したデータ:", fishPointsRef.current);
-        setOceanDataVersion((v) => v + 1);
-      } catch (err) {
-        console.error('eDNAデータの取得に失敗しました:', err);
-      }
-    }
-
-    fetchFishData();
-  // 依存配列に selectedFullDate を追加することで、カレンダーを変えるたびにこの処理が走るようになる
-  }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
