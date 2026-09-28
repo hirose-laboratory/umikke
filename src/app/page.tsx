@@ -13,8 +13,32 @@ import MapControls from './components/MapControls';
 import WindyMenu from './components/WindyMenu';
 
 // ==========================================
-// 2. データ型の定義
+// 2. Google Maps ＆ データ型の定義
 // ==========================================
+interface GoogleMapInstance {
+  getZoom: () => number;
+  setZoom: (zoom: number) => void;
+  setCenter: (latLng: object) => void;
+  addListener: (event: string, handler: (e: any) => void) => object;
+}
+
+interface GoogleHeatmapLayerInstance {
+  setData: (data: object[]) => void;
+  setOptions: (options: object) => void;
+}
+
+interface GoogleMarkerInstance {
+  addListener: (event: string, handler: () => void) => void;
+  setPosition: (latLng: object) => void;
+  setMap: (map: GoogleMapInstance | null) => void;
+}
+
+interface GoogleInfoWindowInstance {
+  setContent: (content: string) => void;
+  setPosition: (latLng: object) => void;
+  open: (map: GoogleMapInstance, marker?: GoogleMarkerInstance) => void;
+}
+
 interface TimelineDay {
   label: string;
   date: Date;
@@ -27,25 +51,17 @@ interface OceanDataPoint {
   record_timestamp: string;
   sst: number | null;
   cha: number | null;
-  chl?: number | null;
   current_speed: number | null;
   current_direction: number | null;
 }
 
 interface FishPredictionPoint {
-  id?: number;
-  fish_id?: number;
-  fishId?: number;
-  latitude?: number;
-  lat?: number;
-  longitude?: number;
-  lng?: number;
-  target_timestamp?: string;
-  sample_timestamp?: string;
-  record_timestamp?: string;
-  heatmap_value?: number;
-  value?: number;
-  count?: number;
+  id: number;
+  fish_id: number;
+  latitude: number;
+  longitude: number;
+  target_timestamp: string;
+  heatmap_value: number;
 }
 
 interface Hotpoint {
@@ -58,12 +74,12 @@ interface Hotpoint {
   intensity_score?: number;
 }
 
-// 魚種名からバックエンドの固有IDへ変換する関数
+// 魚種名からバックエンドの固有ID(1, 2, 3...)へ変換する関数
 const getFishIdByName = (name: string): number => {
   if (name.includes('マダイ') || name.includes('タイ')) return 2;
   if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
   if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
-  return 1;
+  return 1; // デフォルトID
 };
 
 export default function HeatmapPage() {
@@ -71,16 +87,15 @@ export default function HeatmapPage() {
   // 3. Google Maps オブジェクト参照 (Ref)
   // ==========================================
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const heatmapLayerRef = useRef<any>(null);
-  const fishHeatmapLayerRef = useRef<any>(null);
-  const currentLocationMarkerRef = useRef<any>(null);
-  const infoWindowRef = useRef<any>(null);
-  
+  const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
+  const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
+  const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
   const fishPointsRef = useRef<FishPredictionPoint[]>([]);
-  const oceanPointsRef = useRef<OceanDataPoint[]>([]);
-  const hotpointMarkersRef = useRef<any[]>([]);
+  const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
+  const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
+  const hotpointMarkersRef = useRef<GoogleMarkerInstance[]>([]);
   const arrowMarkersRef = useRef<any[]>([]);
+  const oceanPointsRef = useRef<OceanDataPoint[]>([]);
 
   // ==========================================
   // 4. アプリケーション状態管理 (State)
@@ -97,7 +112,7 @@ export default function HeatmapPage() {
   const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(false);
   const [calYear, setCalYear] = useState<number>(initDate.getFullYear());
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth());
-  const [isMounted, setIsMounted] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // レイヤー・テーマ選択状態
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
@@ -130,7 +145,7 @@ export default function HeatmapPage() {
     setIsMounted(true);
   }, []);
 
-  // 水温(sst)とクロロフィル(chl)の排他切り替えロジック
+  // 水温とクロロフィルを切り替え式にするフィルター
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveMarineLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
@@ -142,7 +157,7 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  // 選択中の日付算出
+  // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + currentProgress);
@@ -180,10 +195,7 @@ export default function HeatmapPage() {
   // 6. ユーザー認証機能
   // ==========================================
   const handleEmailLogin = async () => {
-    if (!email || !password) {
-      alert('メールアドレスとパスワードを入力してください。');
-      return;
-    }
+    if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
     try {
       const res = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
@@ -192,33 +204,21 @@ export default function HeatmapPage() {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
-        alert('ログインに失敗しました: ' + (errBody?.message || `status ${res.status}`));
-        return;
+        alert('ログインに失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
       const data = await res.json();
       const token = data.token ?? data.access_token ?? '';
       const loggedEmail = data.email ?? email;
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: loggedEmail }));
-      setIsLoggedIn(true);
-      setLoggedInEmail(loggedEmail);
-      setShowLoginModal(false);
-      setShowWindyMenu(true);
-      setPassword('');
+      setIsLoggedIn(true); setLoggedInEmail(loggedEmail); setShowLoginModal(false); setShowWindyMenu(true); setPassword('');
     } catch (err) {
-      console.error(err);
-      alert('ログイン処理中にエラーが発生しました。');
+      console.error(err); alert('ログイン処理中にエラーが発生しました。');
     }
   };
 
   const handleRegisterSubmit = async () => {
-    if (!email || !password) {
-      alert('登録するメールアドレスとパスワードを入力してください。');
-      return;
-    }
-    if (password.length < 6) {
-      alert('パスワードは6文字以上で設定してください。');
-      return;
-    }
+    if (!email || !password) { alert('登録するメールアドレスとパスワードを入力してください。'); return; }
+    if (password.length < 6) { alert('パスワードは6文字以上で設定してください。'); return; }
     try {
       const res = await fetch(`${API_BASE_URL}/users/`, {
         method: 'POST',
@@ -227,34 +227,26 @@ export default function HeatmapPage() {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
-        alert('登録に失敗しました: ' + (errBody?.message || `status ${res.status}`));
-        return;
+        alert('登録に失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
       const data = await res.json();
       const token = data.token ?? data.access_token ?? '';
       const registeredEmail = data.email ?? email;
       if (token) {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: registeredEmail }));
-        setIsLoggedIn(true);
-        setLoggedInEmail(registeredEmail);
-        setShowLoginModal(false);
-        setShowWindyMenu(true);
+        setIsLoggedIn(true); setLoggedInEmail(registeredEmail); setShowLoginModal(false); setShowWindyMenu(true);
       } else {
-        alert('アカウント登録が完了しました！ログインしてください。');
-        setIsSignUp(false);
+        alert('アカウント登録が完了しました！ログインしてください。'); setIsSignUp(false);
       }
       setPassword('');
     } catch (err) {
-      console.error(err);
-      alert('登録処理中にエラーが発生しました。');
+      console.error(err); alert('登録処理中にエラーが発生しました。');
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
-    setIsLoggedIn(false);
-    setLoggedInEmail(null);
-    setShowWindyMenu(false);
+    setIsLoggedIn(false); setLoggedInEmail(null); setShowWindyMenu(false);
   };
 
   const handleDeleteAccount = async () => {
@@ -272,14 +264,11 @@ export default function HeatmapPage() {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
-        alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`));
-        return;
+        alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
-      alert('アカウントを削除しました。');
-      handleLogout();
+      alert('アカウントを削除しました。'); handleLogout();
     } catch (err) {
-      console.error(err);
-      alert('削除処理中にエラーが発生しました。');
+      console.error(err); alert('削除処理中にエラーが発生しました。');
     }
   };
 
@@ -289,10 +278,7 @@ export default function HeatmapPage() {
       if (stored) {
         try {
           const auth = JSON.parse(stored);
-          if (auth?.email) {
-            setIsLoggedIn(true);
-            setLoggedInEmail(auth.email);
-          }
+          if (auth?.email) { setIsLoggedIn(true); setLoggedInEmail(auth.email); }
         } catch {
           localStorage.removeItem(AUTH_STORAGE_KEY);
         }
@@ -307,30 +293,23 @@ export default function HeatmapPage() {
     const days: TimelineDay[] = [];
     const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(baseDate);
-      d.setDate(baseDate.getDate() + i);
+      const d = new Date(baseDate); d.setDate(baseDate.getDate() + i);
       days.push({ label: `${d.getMonth() + 1}/${d.getDate()}(${weekDays[d.getDay()]})`, date: d });
     }
     return days;
   }, [baseDate]);
 
   const formattedSelectedDate = useMemo(() => {
-    const y = selectedFullDate.getFullYear();
-    const m = selectedFullDate.getMonth() + 1;
-    const d = selectedFullDate.getDate();
+    const y = selectedFullDate.getFullYear(); const m = selectedFullDate.getMonth() + 1; const d = selectedFullDate.getDate();
     return `${y}年${m}月${d}日`;
   }, [selectedFullDate]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isPlaying) {
-      intervalId = setInterval(() => {
-        setCurrentProgress((prev) => (prev + 1) % 7);
-      }, 1000);
+      intervalId = setInterval(() => { setCurrentProgress((prev) => (prev + 1) % 7); }, 1000);
     }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
+    return () => { if (intervalId) clearInterval(intervalId); };
   }, [isPlaying]);
 
   // ==========================================
@@ -340,7 +319,7 @@ export default function HeatmapPage() {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
     const google = window.google;
     const allPoints = oceanPointsRef.current;
-
+    
     const targetYear = selectedFullDate.getFullYear();
     const targetMonth = selectedFullDate.getMonth();
     const targetDateNum = selectedFullDate.getDate();
@@ -349,26 +328,25 @@ export default function HeatmapPage() {
       if (!p.record_timestamp) return false;
       const safeTimestamp = p.record_timestamp.replace(' ', 'T');
       const pDate = new Date(safeTimestamp);
-      return (
-        pDate.getFullYear() === targetYear &&
-        pDate.getMonth() === targetMonth &&
-        pDate.getDate() === targetDateNum
-      );
+      return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
-    // 1. 海況ヒートマップ (水温・クロロフィル)
+    // 海況ヒートマップ (水温・クロロフィル)
     if (heatmapLayerRef.current) {
       const hasSst = activeMarineLayers.includes('sst');
       const hasChl = activeMarineLayers.includes('chl');
 
       if ((hasSst || hasChl) && todayPoints.length > 0) {
+        // ----------------------------------------------------
+        // 1. 本日データの最小値 (min) ・ 最大値 (max) を抽出
+        // ----------------------------------------------------
         const sstValues = todayPoints
           .map((p) => (p.sst !== null && p.sst !== undefined ? Number(p.sst) : null))
           .filter((v): v is number => v !== null && !isNaN(v));
 
         const chlValues = todayPoints
           .map((p) => {
-            const raw = p.chl ?? p.cha;
+            const raw = (p as any).chl ?? (p as any).cha;
             return raw !== null && raw !== undefined ? Number(raw) : null;
           })
           .filter((v): v is number => v !== null && !isNaN(v));
@@ -381,17 +359,21 @@ export default function HeatmapPage() {
         const maxChl = chlValues.length > 0 ? Math.max(...chlValues) : 0;
         const chlRange = maxChl - minChl;
 
+        // ----------------------------------------------------
+        // 2. 最小〜最大の中で 0〜100 に動的スケール変換 (weight計算)
+        // ----------------------------------------------------
         const heatPoints = todayPoints.map((p) => {
           let normalizedSst = 0;
           let normalizedChl = 0;
 
           if (hasSst && p.sst !== null && p.sst !== undefined) {
             const val = Number(p.sst);
+            // 範囲差がある場合は 0〜100 に換算（範囲がない場合は中央値50）
             normalizedSst = sstRange > 0 ? ((val - minSst) / sstRange) * 100 : 50;
           }
 
           if (hasChl) {
-            const rawChl = p.chl ?? p.cha;
+            const rawChl = (p as any).chl ?? (p as any).cha;
             if (rawChl !== null && rawChl !== undefined) {
               const val = Number(rawChl);
               normalizedChl = chlRange > 0 ? ((val - minChl) / chlRange) * 100 : 50;
@@ -409,7 +391,10 @@ export default function HeatmapPage() {
           };
         });
 
-        let gradient: string[] | null = null;
+        // ----------------------------------------------------
+        // 3. テーマごとのグラデーション定義
+        // ----------------------------------------------------
+        let gradient = null;
         if (marineTheme === 'rainbow') {
           gradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
         } else if (marineTheme === 'ocean') {
@@ -422,7 +407,7 @@ export default function HeatmapPage() {
               'rgba(123, 31, 162, 0)',
               'rgba(123, 31, 162, 1)',
               'rgba(233, 30, 99, 1)',
-              'rgba(255, 23, 68, 1)',
+              'rgba(255, 23, 68, 1)'
             ];
           } else {
             gradient = [
@@ -432,30 +417,34 @@ export default function HeatmapPage() {
               'rgba(0, 255, 0, 1.0)',
               'rgba(255, 255, 0, 1.0)',
               'rgba(255, 165, 0, 1.0)',
-              'rgba(255, 0, 0, 1.0)',
+              'rgba(255, 0, 0, 1.0)'
             ];
           }
         }
 
-        (heatmapLayerRef.current as any).setData(heatPoints);
-        (heatmapLayerRef.current as any).setOptions({
-          maxIntensity: 100,
-          radius: 45,
-          gradient: gradient,
+        heatmapLayerRef.current.setData(heatPoints);
+        
+        // ----------------------------------------------------
+        // 4. 表示オプション設定
+        // ----------------------------------------------------
+        heatmapLayerRef.current.setOptions({ 
+          maxIntensity: 100, // 0〜100に規格化しているため100固定で常にフルスケール表示
+          radius: 45,        // 点同士が太く綺麗につながるサイズ
+          gradient: gradient
         });
       } else {
-        (heatmapLayerRef.current as any).setData([]);
+        heatmapLayerRef.current.setData([]);
       }
     }
 
-    // 2. 流向・流速ベクトル (矢印マーカー)
-    arrowMarkersRef.current.forEach((marker) => marker.setMap(null));
+    // 流向・流速ベクトル (矢印)
+    arrowMarkersRef.current.forEach(marker => marker.setMap(null));
     arrowMarkersRef.current = [];
 
     if (activeMarineLayers.includes('current')) {
       const validSpeeds = todayPoints
-        .map((p) => Number(p.current_speed ?? 0))
-        .filter((s) => s > 0);
+        .map(p => Number(p.current_speed ?? 0))
+        .filter(s => s > 0);
 
       if (validSpeeds.length > 0) {
         const minSpeed = Math.min(...validSpeeds);
@@ -465,7 +454,7 @@ export default function HeatmapPage() {
         const MIN_ARROW_LENGTH = 5;
         const MAX_ARROW_LENGTH = 20;
 
-        todayPoints.forEach((p) => {
+        todayPoints.forEach(p => {
           const speed = Number(p.current_speed ?? 0);
           const direction = Number(p.current_direction ?? 0);
 
@@ -473,7 +462,7 @@ export default function HeatmapPage() {
             let arrowLength = MIN_ARROW_LENGTH;
             if (speedRange > 0) {
               const normalizedRatio = (speed - minSpeed) / speedRange;
-              arrowLength = MIN_ARROW_LENGTH + normalizedRatio * (MAX_ARROW_LENGTH - MIN_ARROW_LENGTH);
+              arrowLength = MIN_ARROW_LENGTH + (normalizedRatio * (MAX_ARROW_LENGTH - MIN_ARROW_LENGTH));
             }
 
             const arrowWidth = 4 + ((speed - minSpeed) / (speedRange || 1)) * 2;
@@ -489,9 +478,9 @@ export default function HeatmapPage() {
                 fillColor: '#FF0000',
                 fillOpacity: 0.9,
                 strokeColor: 'white',
-                strokeWeight: 1,
+                strokeWeight: 1
               },
-              zIndex: 1000,
+              zIndex: 1000
             });
             arrowMarkersRef.current.push(arrowMarker);
           }
@@ -499,7 +488,7 @@ export default function HeatmapPage() {
       }
     }
 
-    // 3. 魚種分布 (eDNA予測) ヒートマップ - 自動スケール調整版
+    // 魚種分布 (eDNA予測) ヒートマップ
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
@@ -507,12 +496,12 @@ export default function HeatmapPage() {
           new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
         );
 
-        const targetFishPoints = allFishPoints.filter((p) => {
-          const currentFishId = Number(p.fish_id ?? p.fishId ?? 0);
+        const targetFishPoints = allFishPoints.filter((p: any) => {
+          const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           const isFishMatch = selectedFishIds.includes(currentFishId);
           if (!isFishMatch) return false;
 
-          const timeString = p.target_timestamp || p.sample_timestamp || p.record_timestamp;
+          const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
           if (!timeString) return true;
 
           const safeTimeStr = timeString.replace(' ', 'T');
@@ -524,59 +513,38 @@ export default function HeatmapPage() {
           );
         });
 
-        if (targetFishPoints.length > 0) {
-          // 選択日のデータの最小値・最大値を算出
-          const fishValues = targetFishPoints
-            .map((p) => Number(p.heatmap_value ?? p.value ?? p.count ?? 0))
-            .filter((v) => !isNaN(v));
+        const fishHeatData = targetFishPoints.map((p: any) => {
+          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 1);
+          const lat = Number(p?.latitude ?? p?.lat ?? 0);
+          const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
-          const minFishVal = fishValues.length > 0 ? Math.min(...fishValues) : 0;
-          const maxFishVal = fishValues.length > 0 ? Math.max(...fishValues) : 1;
-          const fishValRange = maxFishVal - minFishVal;
+          return {
+            location: new google.maps.LatLng(lat, lng),
+            weight: rawVal > 0 ? rawVal * 10 : 10,
+          };
+        });
 
-          const fishHeatData = targetFishPoints.map((p) => {
-            const rawVal = Number(p.heatmap_value ?? p.value ?? p.count ?? 0);
-            const lat = Number(p.latitude ?? p.lat ?? 0);
-            const lng = Number(p.longitude ?? p.lng ?? 0);
-
-            // 海況データ同様、0〜100 に自動調整（全点同じ値の場合は 50）
-            const normalizedWeight =
-              fishValRange > 0 ? ((rawVal - minFishVal) / fishValRange) * 100 : 50;
-
-            return {
-              location: new google.maps.LatLng(lat, lng),
-              weight: normalizedWeight,
-            };
-          });
-
-          let fishGradient: string[];
-          if (fishTheme === 'rainbow') {
-            fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
-          } else if (fishTheme === 'colorblind') {
-            fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
-          } else {
-            fishGradient = [
-              'rgba(142, 36, 170, 0)',
-              'rgba(142, 36, 170, 1)',
-              'rgba(255, 152, 0, 1)',
-              'rgba(255, 235, 59, 1)',
-            ];
-          }
-
-          (fishHeatmapLayerRef.current as any).setData(fishHeatData);
-          (fishHeatmapLayerRef.current as any).setOptions({
-            gradient: fishGradient,
-            radius: 45, // 表示が見やすくなるよう半径を45に拡大
-            maxIntensity: 100,
-          });
+        let fishGradient: string[];
+        if (fishTheme === 'rainbow') {
+          fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+        } else if (fishTheme === 'colorblind') {
+          fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
         } else {
-          (fishHeatmapLayerRef.current as any).setData([]);
+          fishGradient = ['rgba(142, 36, 170, 0)', 'rgba(142, 36, 170, 1)', 'rgba(255, 152, 0, 1)', 'rgba(255, 235, 59, 1)'];
         }
+
+        fishHeatmapLayerRef.current.setData(fishHeatData);
+        fishHeatmapLayerRef.current.setOptions({
+          gradient: fishGradient,
+          radius: 25, 
+          maxIntensity: 100, 
+        });
       } else {
-        (fishHeatmapLayerRef.current as any).setData([]);
+        fishHeatmapLayerRef.current.setData([]);
       }
     }
   }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme]);
+
 
   useEffect(() => {
     if (!mapReady) return;
@@ -586,29 +554,45 @@ export default function HeatmapPage() {
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA)
   // ==========================================
+  
+  // 海上状況データ（OceanData）を取得
   useEffect(() => {
+    // 🟢 起動時ログ
+    console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
+
     let cancelled = false;
     async function fetchOceanData() {
       try {
         const year = selectedFullDate.getFullYear();
         const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
         const day = String(selectedFullDate.getDate()).padStart(2, '0');
-
+        
         const start = `${year}-${month}-${day}T00:00:00`;
         const end = `${year}-${month}-${day}T23:59:59`;
 
         const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        
+        // 🔵 リクエスト前ログ
+        console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
+        console.log(`➡️ fetch実行: ${url}`);
 
         const res = await fetch(url);
         if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
-
+        
         const data: OceanDataPoint[] = await res.json();
         if (cancelled) return;
-
+        
         oceanPointsRef.current = data;
         setOceanPointCount(data.length);
         setOceanDataVersion((v) => v + 1);
+
+        // ✅ 成功ログ
+        console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`, data);
+
       } catch (err) {
+        // ❌ エラーログ
+        console.error('❌ 海上状況データの取得に失敗しました:', err);
+        
         if (!cancelled) {
           const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
           setOceanError(message);
@@ -622,19 +606,23 @@ export default function HeatmapPage() {
     setOceanError(null);
     fetchOceanData();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
+  
 
+  // 魚種(eDNA)データ取得 (1, 2, 3 の個別IDでリクエスト)
   useEffect(() => {
+    console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
+
     async function fetchFishData() {
       if (activeFishLayers.length === 0) {
+        console.log("🟡 魚種が選択されていないため、データ取得をスキップします");
         fishPointsRef.current = [];
         setOceanDataVersion((v) => v + 1);
         return;
       }
 
+      // 選択された魚種からそれぞれの正確な固有ID（重複除去）を取得
       const fishIds: number[] = Array.from(
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
@@ -642,13 +630,14 @@ export default function HeatmapPage() {
       const year = selectedFullDate.getFullYear();
       const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
-      
-      const start = `${year}-${month}-${day}T00:00:00`;
-      const end = `${year}-${month}-${day}T23:59:59`;
+      const targetDateStr = `${year}-${month}-${day}`;
+
+      console.log(`🔵 APIにリクエストを送ります: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
 
       try {
         const requests = fishIds.map((id) => {
-          const url = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+          const url = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
+          console.log(`➡️ fetch実行: ${url}`);
           return fetch(url).then((res) => {
             if (!res.ok) throw new Error(`Status ${res.status}`);
             return res.json();
@@ -657,9 +646,10 @@ export default function HeatmapPage() {
 
         const results = await Promise.all(requests);
         fishPointsRef.current = results.flat();
+        console.log("✅ バックエンドからデータ取得成功！:", fishPointsRef.current);
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
-        console.error('eDNAデータの取得に失敗しました:', err);
+        console.error('❌ eDNAデータの取得に失敗しました:', err);
       }
     }
 
@@ -667,14 +657,12 @@ export default function HeatmapPage() {
   }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
   // ==========================================
-  // 10. Google Maps 初期化 & イベント設定
+  // 10. Google Maps 初期化 ＆ イベント設定
   // ==========================================
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
     if (!apiKey) {
-      queueMicrotask(() => {
-        setMapLoadError('Google Maps APIキーが設定されていません。');
-      });
+      queueMicrotask(() => { setMapLoadError('Google Maps APIキーが設定されていません。'); });
       return;
     }
 
@@ -686,75 +674,47 @@ export default function HeatmapPage() {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
       newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
-      newScript.async = true;
-      newScript.defer = true;
-      newScript.onload = () => {
-        if (!cancelled) initMap();
-      };
-      newScript.onerror = () => {
-        if (!cancelled) setMapLoadError('スクリプト読み込みに失敗しました。');
-      };
+      newScript.async = true; newScript.defer = true;
+      newScript.onload = () => { if (!cancelled) initMap(); };
+      newScript.onerror = () => { if (!cancelled) setMapLoadError('スクリプト読み込みに失敗しました。'); };
       document.head.appendChild(newScript);
     } else if (typeof window !== 'undefined' && window.google) {
-      queueMicrotask(() => {
-        if (!cancelled) initMap();
-      });
+      queueMicrotask(() => { if (!cancelled) initMap(); });
     } else {
-      script.onload = () => {
-        if (!cancelled) initMap();
-      };
+      script.onload = () => { if (!cancelled) initMap(); };
     }
 
     function initMap() {
       if (!mapRef.current) return;
       if (typeof window === 'undefined' || !window.google || !window.google.maps) return;
-
+      
       const google = window.google;
       const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 34.42, lng: 136.88 },
-        zoom: 11,
-        mapTypeId: 'roadmap',
+        center: { lat: 34.420, lng: 136.880 }, zoom: 11, mapTypeId: 'roadmap',
         styles: [
           { elementType: 'labels', stylers: [{ visibility: 'off' }] },
           { featureType: 'poi', stylers: [{ visibility: 'off' }] },
           { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-          { featureType: 'road', stylers: [{ visibility: 'off' }] },
-        ],
-        disableDefaultUI: true,
+          { featureType: 'road', stylers: [{ visibility: 'off' }] }
+        ], disableDefaultUI: true,
       });
       mapInstanceRef.current = map;
 
-      const customGradient = [
-        'rgba(0, 0, 0, 0)',
-        'rgba(0, 0, 255, 1.0)',
-        'rgba(0, 255, 255, 1.0)',
-        'rgba(0, 255, 0, 1.0)',
-        'rgba(255, 255, 0, 1.0)',
-        'rgba(255, 165, 0, 1.0)',
-        'rgba(255, 0, 0, 1.0)',
-      ];
+      const customGradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
       heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [],
-        map: map,
-        gradient: customGradient,
-        radius: 20,
-        opacity: 0.85,
+        data: [], map: map, gradient: customGradient, radius: 20, opacity: 0.85
       });
 
       fishHeatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [],
-        map: map,
-        radius: 25,
-        opacity: 0.85,
+        data: [], map: map, radius: 25, opacity: 0.85
       });
-
+      
       infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
-      map.addListener('click', (e: google.maps.MapMouseEvent) => {
-        if (!e.latLng) return;
+      map.addListener('click', (e: any) => {
         const clickLat = e.latLng.lat();
         const clickLng = e.latLng.lng();
-
+        
         const targetDate = selectedFullDateRef.current;
         const targetYear = targetDate.getFullYear();
         const targetMonth = targetDate.getMonth();
@@ -763,11 +723,7 @@ export default function HeatmapPage() {
         const todayPoints = oceanPointsRef.current.filter((p) => {
           if (p.sst === null || p.sst === undefined) return false;
           const pDate = new Date(p.record_timestamp);
-          return (
-            pDate.getFullYear() === targetYear &&
-            pDate.getMonth() === targetMonth &&
-            pDate.getDate() === targetDateNum
-          );
+          return (pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum);
         });
 
         if (todayPoints.length === 0) return;
@@ -784,11 +740,8 @@ export default function HeatmapPage() {
 
         if (minDistance > 0.05) return;
 
-        const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-
+        const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        
         infoWindowRef.current?.setContent(`
           <div style="padding: 12px; color: #333; font-size: 16px;">
             <strong style="font-size: 18px; color: #0044cc;">観測ポイント詳細</strong><br/>
@@ -803,9 +756,7 @@ export default function HeatmapPage() {
 
       setMapReady(true);
     }
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   // 漁場サジェストマーカー描画
@@ -814,10 +765,10 @@ export default function HeatmapPage() {
     const map = mapInstanceRef.current;
     const google = window.google;
 
-    hotpointMarkersRef.current.forEach((m) => m.setMap(null));
+    hotpointMarkersRef.current.forEach(m => m.setMap(null));
     hotpointMarkersRef.current = [];
 
-    hotpoints.forEach((hp) => {
+    hotpoints.forEach(hp => {
       const marker = new google.maps.Marker({
         position: { lat: hp.latitude, lng: hp.longitude },
         map: map,
@@ -827,9 +778,9 @@ export default function HeatmapPage() {
           fillOpacity: 0.8,
           strokeColor: 'white',
           strokeWeight: 2,
-          scale: 9,
+          scale: 9
         },
-        title: '漁場サジェスト',
+        title: '漁場サジェスト'
       });
 
       marker.addListener('click', () => {
@@ -851,42 +802,29 @@ export default function HeatmapPage() {
   }, [hotpoints, mapReady]);
 
   // ==========================================
-  // 11. カレンダー & マップコントロール処理
+  // 11. カレンダー ＆ マップコントロール処理
   // ==========================================
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
   const calendarCells: (number | null)[] = [];
-  for (let i = 0; i < firstDayIndex; i++) {
-    calendarCells.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    calendarCells.push(i);
-  }
+  for (let i = 0; i < firstDayIndex; i++) { calendarCells.push(null); }
+  for (let i = 1; i <= daysInMonth; i++) { calendarCells.push(i); }
+
   while (calendarCells.length < 42) {
     calendarCells.push(null);
   }
 
   const getCalendarDayStatus = (dateNum: number | null) => {
     if (!dateNum) return { isToday: false, isSelected: false };
-    const today = new Date();
-    const cellDate = new Date(calYear, calMonth, dateNum);
-    const isToday =
-      cellDate.getDate() === today.getDate() &&
-      cellDate.getMonth() === today.getMonth() &&
-      cellDate.getFullYear() === today.getFullYear();
-    const isSelected =
-      cellDate.getDate() === baseDate.getDate() &&
-      cellDate.getMonth() === baseDate.getMonth() &&
-      cellDate.getFullYear() === baseDate.getFullYear();
+    const today = new Date(); const cellDate = new Date(calYear, calMonth, dateNum);
+    const isToday = cellDate.getDate() === today.getDate() && cellDate.getMonth() === today.getMonth() && cellDate.getFullYear() === today.getFullYear();
+    const isSelected = cellDate.getDate() === baseDate.getDate() && cellDate.getMonth() === baseDate.getMonth() && cellDate.getFullYear() === baseDate.getFullYear();
     return { isToday, isSelected };
   };
 
   const handleZoom = (amount: number) => {
     if (!mapInstanceRef.current) return;
-    const currentZoom = mapInstanceRef.current.getZoom();
-    if (typeof currentZoom === 'number') {
-      mapInstanceRef.current.setZoom(currentZoom + amount);
-    }
+    const currentZoom = mapInstanceRef.current.getZoom(); mapInstanceRef.current.setZoom(currentZoom + amount);
   };
 
   const handleJumpToCurrentLocation = () => {
@@ -905,24 +843,13 @@ export default function HeatmapPage() {
               position: currentLatLng,
               map: mapInstanceRef.current,
               title: '現在地',
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: '#0044cc',
-                fillOpacity: 1.0,
-                strokeColor: 'white',
-                strokeWeight: 3,
-                scale: 4,
-              },
+              icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#0044cc', fillOpacity: 1.0, strokeColor: 'white', strokeWeight: 3, scale: 4 },
             });
           }
         },
-        () => {
-          alert('位置情報の取得に失敗しました。');
-        }
+        () => { alert('位置情報の取得に失敗しました。'); }
       );
-    } else {
-      alert('ブラウザが位置情報に対応していません。');
-    }
+    } else { alert('ブラウザが位置情報に対応していません。'); }
   };
 
   if (!isMounted) return null;
@@ -932,36 +859,33 @@ export default function HeatmapPage() {
   // ==========================================
   return (
     <>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-      />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/>
 
       <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', fontFamily: 'sans-serif', fontSize: '28px' }}>
+
         {/* 地図キャンバス */}
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
         {/* メインUIオーバーレイ */}
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
+
           {/* ヘッダーロゴ */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '25px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 20,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <img
-              src="/site-logo.png"
-              alt="サイトロゴ"
-              style={{
-                height: '70px',
+          <div style={{
+            position: 'absolute',
+            top: '25px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <img 
+              src="/site-logo.png" 
+              alt="サイトロゴ" 
+              style={{ 
+                height: '70px', 
                 width: 'auto',
                 filter: `
                   drop-shadow(2px 0 0 #ffffff) 
@@ -969,96 +893,50 @@ export default function HeatmapPage() {
                   drop-shadow(0 2px 0 #ffffff) 
                   drop-shadow(0 -2px 0 #ffffff) 
                   drop-shadow(0 3px 6px rgba(0, 30, 60, 0.5))
-                `,
-              }}
+                `
+              }} 
             />
           </div>
 
           {/* 右上アカウント・メニュー操作 */}
           <TopRightMenu
-            isLoggedIn={isLoggedIn}
-            loggedInEmail={loggedInEmail}
+            isLoggedIn={isLoggedIn} 
+            loggedInEmail={loggedInEmail} 
             setShowWindyMenu={setShowWindyMenu}
-            setIsSignUp={setIsSignUp}
+            setIsSignUp={setIsSignUp} 
             setShowLoginModal={setShowLoginModal}
           />
 
           {/* 右側レイヤー選択サイドバー */}
           <RightSidebar
-            showMarinePanel={showMarinePanel}
-            setShowMarinePanel={setShowMarinePanel}
-            showFishPanel={showFishPanel}
-            setShowFishPanel={setShowFishPanel}
-            activeMarineLayers={activeMarineLayers}
-            setActiveMarineLayers={handleMarineLayersUpdate}
-            activeFishLayers={activeFishLayers}
-            setActiveFishLayers={setActiveFishLayers}
+            showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
+            showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
+            activeMarineLayers={activeMarineLayers} setActiveMarineLayers={handleMarineLayersUpdate}
+            activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
           />
 
           {/* 左下動的凡例 */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
             {activeMarineLayers.includes('sst') && (
-              <div
-                className="slider-container"
-                style={{
-                  background: '#888',
-                  color: 'white',
-                  borderRadius: '30px',
-                  padding: '16px 28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '24px',
-                  fontSize: '24px',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                  pointerEvents: 'auto',
-                }}
-              >
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right' }}>15℃</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px' }} />
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: legendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', width: '60px' }}>25℃</span>
               </div>
             )}
 
             {activeMarineLayers.includes('chl') && (
-              <div
-                className="slider-container"
-                style={{
-                  background: '#888',
-                  color: 'white',
-                  borderRadius: '30px',
-                  padding: '16px 28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '24px',
-                  fontSize: '24px',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                  pointerEvents: 'auto',
-                }}
-              >
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', minWidth: '70px', textAlign: 'right', fontSize: '18px' }}>0 mg/m³</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: chlLegendGradientStyle, borderRadius: '12px' }} />
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: chlLegendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', minWidth: '70px', fontSize: '18px' }}>20 mg/m³</span>
               </div>
             )}
 
             {activeFishLayers.length > 0 && (
-              <div
-                className="slider-container"
-                style={{
-                  background: '#888',
-                  color: 'white',
-                  borderRadius: '30px',
-                  padding: '16px 28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '24px',
-                  fontSize: '24px',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                  pointerEvents: 'auto',
-                }}
-              >
+              <div className="slider-container" style={{ background: '#888', color: 'white', borderRadius: '30px', padding: '16px 28px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
                 <span style={{ fontWeight: 'bold', width: '60px', textAlign: 'right', fontSize: '18px' }}>低濃度</span>
-                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }} />
+                <div className="slider-bar" style={{ width: '260px', height: '24px', background: fishLegendGradientStyle, borderRadius: '12px' }}></div>
                 <span style={{ fontWeight: 'bold', width: '60px', fontSize: '18px' }}>高濃度</span>
               </div>
             )}
@@ -1066,101 +944,31 @@ export default function HeatmapPage() {
 
           {/* 左上データ取得ステータス表示 */}
           {(oceanLoading || oceanError) && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '30px',
-                left: '30px',
-                background: oceanError ? '#c62828' : '#555',
-                color: 'white',
-                padding: '16px 28px',
-                borderRadius: '30px',
-                fontSize: '24px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                pointerEvents: oceanError ? 'auto' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                maxWidth: '80vw',
-              }}
-            >
+            <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: oceanError ? 'auto' : 'none', display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '80vw' }}>
               <span>{oceanError ? `データ取得エラー: ${oceanError}` : 'データを同期中...'}</span>
               {oceanError && (
-                <button
-                  onClick={() => setOceanRetryKey((k) => k + 1)}
-                  style={{
-                    background: 'white',
-                    color: '#c62828',
-                    border: 'none',
-                    borderRadius: '20px',
-                    padding: '8px 20px',
-                    fontSize: '20px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  再試行
-                </button>
+                <button onClick={() => setOceanRetryKey((k) => k + 1)} style={{ background: 'white', color: '#c62828', border: 'none', borderRadius: '20px', padding: '8px 20px', fontSize: '20px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}>再試行</button>
               )}
             </div>
           )}
           {!oceanLoading && !oceanError && oceanPointCount > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '30px',
-                left: '30px',
-                background: 'rgba(0,0,0,0.55)',
-                color: 'white',
-                padding: '10px 22px',
-                borderRadius: '30px',
-                fontSize: '20px',
-                pointerEvents: 'none',
-              }}
-            >
+            <div style={{ position: 'absolute', top: '30px', left: '30px', background: 'rgba(0,0,0,0.55)', color: 'white', padding: '10px 22px', borderRadius: '30px', fontSize: '20px', pointerEvents: 'none' }}>
               全 {oceanPointCount.toLocaleString()} 件から抽出（日単位表示）
             </div>
           )}
 
           {/* 地図読み込みエラー表示 */}
           {mapLoadError && (
-            <div
-              style={{
-                position: 'absolute',
-                top: oceanLoading || oceanError ? '90px' : '30px',
-                left: '30px',
-                background: '#c62828',
-                color: 'white',
-                padding: '16px 28px',
-                borderRadius: '30px',
-                fontSize: '22px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                pointerEvents: 'none',
-                maxWidth: '80vw',
-              }}
-            >
+            <div style={{ position: 'absolute', top: (oceanLoading || oceanError) ? '90px' : '30px', left: '30px', background: '#c62828', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '22px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: 'none', maxWidth: '80vw' }}>
               地図エラー: {mapLoadError}
             </div>
           )}
 
           {/* 下部タイムライン操作バー */}
           <TimelineBar
-            isPlaying={isPlaying}
-            setIsPlaying={setIsPlaying}
-            timelineDays={timelineDays}
-            currentProgress={currentProgress}
-            setCurrentProgress={setCurrentProgress}
-            showMiniCalendar={showMiniCalendar}
-            setShowMiniCalendar={setShowMiniCalendar}
-            calYear={calYear}
-            setCalYear={setCalYear}
-            calMonth={calMonth}
-            setCalMonth={setCalMonth}
-            calendarCells={calendarCells}
-            getCalendarDayStatus={getCalendarDayStatus}
-            setBaseDate={setBaseDate}
-            formattedSelectedDate={formattedSelectedDate}
+            isPlaying={isPlaying} setIsPlaying={setIsPlaying} timelineDays={timelineDays} currentProgress={currentProgress} setCurrentProgress={setCurrentProgress}
+            showMiniCalendar={showMiniCalendar} setShowMiniCalendar={setShowMiniCalendar} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth}
+            calendarCells={calendarCells} getCalendarDayStatus={getCalendarDayStatus} setBaseDate={setBaseDate} formattedSelectedDate={formattedSelectedDate}
           />
 
           {/* 右下マップ操作ボタン */}
@@ -1169,33 +977,20 @@ export default function HeatmapPage() {
           {/* ログイン・新規登録モーダル */}
           {showLoginModal && (
             <LoginModal
-              setShowLoginModal={setShowLoginModal}
-              isSignUp={isSignUp}
-              setIsSignUp={setIsSignUp}
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              handleRegisterSubmit={handleRegisterSubmit}
-              handleEmailLogin={handleEmailLogin}
+              setShowLoginModal={setShowLoginModal} isSignUp={isSignUp} setIsSignUp={setIsSignUp}
+              email={email} setEmail={setEmail} password={password} setPassword={setPassword}
+              handleRegisterSubmit={handleRegisterSubmit} handleEmailLogin={handleEmailLogin}
             />
           )}
 
           {/* マイページ・テーマ設定メニュー */}
           <WindyMenu
-            showWindyMenu={showWindyMenu}
-            setShowWindyMenu={setShowWindyMenu}
-            isLoggedIn={isLoggedIn}
-            loggedInEmail={loggedInEmail}
-            handleLogout={handleLogout}
-            handleDeleteAccount={handleDeleteAccount}
-            setIsSignUp={setIsSignUp}
-            setShowLoginModal={setShowLoginModal}
-            marineTheme={marineTheme}
-            setMarineTheme={setMarineTheme}
-            fishTheme={fishTheme}
-            setFishTheme={setFishTheme}
+            showWindyMenu={showWindyMenu} setShowWindyMenu={setShowWindyMenu} isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail}
+            handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount} setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
+            marineTheme={marineTheme} setMarineTheme={setMarineTheme}
+            fishTheme={fishTheme} setFishTheme={setFishTheme}
           />
+
         </div>
       </div>
     </>
