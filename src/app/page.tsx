@@ -722,6 +722,10 @@ export default function HeatmapPage() {
   for (let i = 0; i < firstDayIndex; i++) { calendarCells.push(null); }
   for (let i = 1; i <= daysInMonth; i++) { calendarCells.push(i); }
 
+  while (calendarCells.length < 42) {
+    calendarCells.push(null);
+  }
+
   const getCalendarDayStatus = (dateNum: number | null) => {
     if (!dateNum) return { isToday: false, isSelected: false };
     const today = new Date(); const cellDate = new Date(calYear, calMonth, dateNum);
