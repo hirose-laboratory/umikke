@@ -76,7 +76,7 @@ interface Hotpoint {
 
 // 魚種名からバックエンドの固有ID(1, 2, 3...)へ変換する関数
 const getFishIdByName = (name: string): number => {
-  if (name.includes('マダイ') || name.includes('タイ')) return 2;
+  if (name.includes('伊勢エビ') || name.includes('エビ')) return 2;
   if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
   if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
   return 1; // デフォルトID
@@ -130,6 +130,8 @@ export default function HeatmapPage() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>('名無しアングラー');
+  const [targetFish, setTargetFish] = useState<string>('');
 
   // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
@@ -209,7 +211,12 @@ export default function HeatmapPage() {
       const data = await res.json();
       const token = data.token ?? data.access_token ?? '';
       const loggedEmail = data.email ?? email;
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: loggedEmail }));
+      const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
+        ...existingAuth,
+        token, 
+        email: loggedEmail 
+      }));
       setIsLoggedIn(true); setLoggedInEmail(loggedEmail); setShowLoginModal(false); setShowWindyMenu(true); setPassword('');
     } catch (err) {
       console.error(err); alert('ログイン処理中にエラーが発生しました。');
@@ -233,7 +240,13 @@ export default function HeatmapPage() {
       const token = data.token ?? data.access_token ?? '';
       const registeredEmail = data.email ?? email;
       if (token) {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, email: registeredEmail }));
+        const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
+          ...existingAuth,
+          token, 
+          email: registeredEmail 
+        }));
+        
         setIsLoggedIn(true); setLoggedInEmail(registeredEmail); setShowLoginModal(false); setShowWindyMenu(true);
       } else {
         alert('アカウント登録が完了しました！ログインしてください。'); setIsSignUp(false);
@@ -272,13 +285,46 @@ export default function HeatmapPage() {
     }
   };
 
+  // プロフィールの保存とレイヤー切り替え処理
+  const handleUpdateProfile = (newName: string, newTarget: string) => {
+    setUserName(newName);
+    setTargetFish(newTarget);
+
+    // ターゲット魚種が変更されたら、地図のレイヤーもそれに切り替える
+    if (newTarget) {
+      setActiveFishLayers([newTarget]);
+    }
+
+    // ローカルストレージ内のデータを上書き保存
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    const auth = stored ? JSON.parse(stored) : {};
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+      ...auth,
+      name: newName,
+      targetFish: newTarget
+    }));
+
+    alert('プロフィールを保存しました！');
+  };
+
   useEffect(() => {
     queueMicrotask(() => {
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
         try {
           const auth = JSON.parse(stored);
-          if (auth?.email) { setIsLoggedIn(true); setLoggedInEmail(auth.email); }
+          if (auth?.email) { 
+            setIsLoggedIn(true); 
+            setLoggedInEmail(auth.email); 
+            
+            // プロフィール情報があればStateに復元
+            if (auth.name) setUserName(auth.name);
+            if (auth.targetFish) {
+              setTargetFish(auth.targetFish);
+              // 初期表示レイヤーをターゲット魚種に自動切り替え
+              setActiveFishLayers([auth.targetFish]); 
+            }
+          }
         } catch {
           localStorage.removeItem(AUTH_STORAGE_KEY);
         }
