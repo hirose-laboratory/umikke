@@ -11,7 +11,7 @@ interface WindyMenuProps {
   loggedInEmail: string | null;
   handleLogout: () => void;
   handleDeleteAccount: () => void;
-  setIsSignUp: (isSignえｒぺえUp: boolean) => void;
+  setIsSignUp: (isSignUp: boolean) => void;
   setShowLoginModal: (show: boolean) => void;
   marineTheme?: string;
   setMarineTheme?: (theme: string) => void;
@@ -134,6 +134,44 @@ export default function WindyMenu({
               <button onClick={handleDeleteAccount} style={{ background: 'transparent', color: '#e57373', border: '1px solid #e57373', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
                 アカウントを削除
               </button>
+
+              {/* ▼ プロフィール編集エリアをここ（ログイン中のブロック内）に移動 ▼ */}
+              <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px', marginTop: '20px' }}>
+                <h4 style={{ margin: '0 0 12px 0', color: '#333' }}>プロフィール設定</h4>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>表示名 (ニックネーム)</label>
+                  <input 
+                    type="text" 
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px', color: '#333' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>よく狙うターゲット</label>
+                  <select 
+                    value={editFish}
+                    onChange={(e) => setEditFish(e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px', color: '#333' }}
+                  >
+                    <option value="">選択しない</option>
+                    <option value="カタクチイワシ">カタクチイワシ</option>
+                    <option value="伊勢エビ">伊勢エビ</option>
+                    <option value="ブリ">ブリ</option>
+                  </select>
+                </div>
+
+                <button 
+                  onClick={onSaveProfile}
+                  style={{ background: '#0044cc', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
+                >
+                  変更を保存
+                </button>
+              </div>
+              {/* ▲ プロフィール編集エリアここまで ▲ */}
+
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
@@ -151,42 +189,6 @@ export default function WindyMenu({
             </div>
           )}
 
-
-          {/* ▼ プロフィール編集エリア ▼ */}
-        <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-          <h4 style={{ margin: '0 0 12px 0', color: '#333' }}>プロフィール設定</h4>
-          
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>表示名 (ニックネーム)</label>
-            <input 
-              type="text" 
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>よく狙うターゲット</label>
-            <select 
-              value={editFish}
-              onChange={(e) => setEditFish(e.target.value)}
-              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px' }}
-            >
-              <option value="">選択しない</option>
-              <option value="カタクチイワシ">カタクチイワシ</option>
-              <option value="伊勢エビ">伊勢エビ</option>
-              <option value="ブリ">ブリ</option>
-            </select>
-          </div>
-
-          <button 
-            onClick={onSaveProfile}
-            style={{ background: '#0044cc', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
-          >
-            変更を保存
-          </button>
-        </div>
 
 
           {/* 2. 表示設定 (色彩テーマ設定) エリア */}
