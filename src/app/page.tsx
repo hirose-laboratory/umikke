@@ -220,7 +220,7 @@ export default function HeatmapPage() {
     if (!email || !password) { alert('登録するメールアドレスとパスワードを入力してください。'); return; }
     if (password.length < 6) { alert('パスワードは6文字以上で設定してください。'); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/users/`, {
+      const res = await fetch(`${API_BASE_URL}/users/register`, { // ← /register に変更
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
