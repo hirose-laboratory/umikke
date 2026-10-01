@@ -44,20 +44,25 @@ export default function WindyMenu({
 }: WindyMenuProps) {
   const [editName, setEditName] = useState(userName);
   const [editFish, setEditFish] = useState(targetFish);
+  
+  // ▼ プロフィール編集画面（モーダル）の表示/非表示を管理するState
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // メニューが開かれた時に最新のプロフィール情報をフォームにセットする
+  // メニューやモーダルが開かれた時に最新のプロフィール情報をセット
   useEffect(() => {
-    if (showWindyMenu) {
+    if (showWindyMenu || showProfileModal) {
       setEditName(userName);
       setEditFish(targetFish);
     }
-  }, [showWindyMenu, userName, targetFish]);
+  }, [showWindyMenu, showProfileModal, userName, targetFish]);
 
   // プロフィール保存ボタンを押した時の処理
   const onSaveProfile = () => {
     if (handleUpdateProfile) {
       handleUpdateProfile(editName, editFish);
     }
+    // 保存したらモーダルを閉じる
+    setShowProfileModal(false);
   };
 
   return (
@@ -120,8 +125,8 @@ export default function WindyMenu({
           
           {/* 1. アカウント情報エリア */}
           {isLoggedIn ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
-              <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>ACCOUNT</div>
+            <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
+              <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '20px' }}>ACCOUNT</div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#0044cc' }}>
@@ -133,46 +138,18 @@ export default function WindyMenu({
                 </div>
               </div>
 
-              {/* ▼ プロフィール編集エリア ▼ */}
-              <div style={{ background: '#333333', padding: '20px', borderRadius: '12px', marginTop: '10px', border: '1px solid #444' }}>
-                <h4 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '22px' }}>プロフィール設定</h4>
-                
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '6px' }}>表示名 (ニックネーム)</label>
-                  <input 
-                    type="text" 
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#222', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
-                  />
-                </div>
+              {/* ▼ プロフィール編集を開くボタン（ログアウトとの間に大きな余白を持たせる） ▼ */}
+              <button 
+                onClick={() => setShowProfileModal(true)}
+                style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginTop: '40px', marginBottom: '20px' }}
+              >
+                プロフィールを編集
+              </button>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '6px' }}>よく狙うターゲット</label>
-                  <select 
-                    value={editFish}
-                    onChange={(e) => setEditFish(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#222', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
-                  >
-                    <option value="">選択しない</option>
-                    <option value="カタクチイワシ">カタクチイワシ</option>
-                    <option value="伊勢エビ">伊勢エビ</option>
-                    <option value="ブリ">ブリ</option>
-                  </select>
-                </div>
-
-                <button 
-                  onClick={onSaveProfile}
-                  style={{ background: '#0044cc', color: 'white', border: 'none', padding: '14px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '20px', width: '100%' }}
-                >
-                  変更を保存
-                </button>
-              </div>
-              {/* ▲ プロフィール編集エリア ▲ */}
-
-              <button onClick={handleLogout} style={{ background: '#444', color: 'white', border: '1px solid #666', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
+              <button onClick={handleLogout} style={{ background: '#444', color: 'white', border: '1px solid #666', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '20px' }}>
                 ログアウト
               </button>
+              
               <button onClick={handleDeleteAccount} style={{ background: 'transparent', color: '#e57373', border: '1px solid #e57373', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
                 アカウントを削除
               </button>
@@ -236,9 +213,61 @@ export default function WindyMenu({
               </select>
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* ==========================================
+          3. プロフィール編集用ポップアップモーダル
+      ========================================== */}
+      {showProfileModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 4000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <div style={{ background: '#2a2a2a', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '450px', border: '1px solid #555', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ margin: 0, color: 'white', fontSize: '24px' }}>プロフィール編集</h3>
+              <button onClick={() => setShowProfileModal(false)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>close</span>
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>表示名 (ニックネーム)</label>
+              <input 
+                type="text" 
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '32px' }}>
+              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット</label>
+              <select 
+                value={editFish}
+                onChange={(e) => setEditFish(e.target.value)}
+                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
+              >
+                <option value="">選択しない</option>
+                <option value="カタクチイワシ">カタクチイワシ</option>
+                <option value="伊勢エビ">伊勢エビ</option>
+                <option value="ブリ">ブリ</option>
+              </select>
+            </div>
+
+            <button 
+              onClick={onSaveProfile}
+              style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '20px', width: '100%' }}
+            >
+              変更を保存
+            </button>
+
+          </div>
+        </div>
+      )}
     </>
   );
 }
