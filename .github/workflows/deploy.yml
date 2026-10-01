@@ -25,6 +25,7 @@ jobs:
           --exclude=".next" \
           --exclude=".env" \
           --exclude=".env.local" \
+          --exclude="README.md" \
           -e "ssh -o StrictHostKeyChecking=no" \
           ./ ubuntu@27.133.132.208:/home/ubuntu/frontend/umikke/
     - name: Build Project
