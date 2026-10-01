@@ -1,4 +1,5 @@
 'use client';
+import React, { useState, useEffect } from 'react';
 
 // ==========================================
 // 1. 型定義 (Props)
@@ -10,12 +11,15 @@ interface WindyMenuProps {
   loggedInEmail: string | null;
   handleLogout: () => void;
   handleDeleteAccount: () => void;
-  setIsSignUp: (isSignUp: boolean) => void;
+  setIsSignUp: (isSignえｒぺえUp: boolean) => void;
   setShowLoginModal: (show: boolean) => void;
   marineTheme?: string;
   setMarineTheme?: (theme: string) => void;
   fishTheme?: string;
   setFishTheme?: (theme: string) => void;
+  userName?: string;
+  targetFish?: string;
+  handleUpdateProfile?: (name: string, fish: string) => void;
 }
 
 // ==========================================
@@ -34,7 +38,28 @@ export default function WindyMenu({
   setMarineTheme,
   fishTheme = 'default',
   setFishTheme,
+  userName = '名無しアングラー',
+  targetFish = '',
+  handleUpdateProfile
 }: WindyMenuProps) {
+  const [editName, setEditName] = useState(userName);
+  const [editFish, setEditFish] = useState(targetFish);
+
+  // メニューが開かれた時に最新のプロフィール情報をフォームにセットする
+  useEffect(() => {
+    if (showWindyMenu) {
+      setEditName(userName);
+      setEditFish(targetFish);
+    }
+  }, [showWindyMenu, userName, targetFish]);
+
+  // プロフィール保存ボタンを押した時の処理
+  const onSaveProfile = () => {
+    if (handleUpdateProfile) {
+      handleUpdateProfile(editName, editFish);
+    }
+  };
+
   return (
     <>
       {/* 背景オーバーレイ */}
@@ -125,6 +150,44 @@ export default function WindyMenu({
               </button>
             </div>
           )}
+
+
+          {/* ▼ プロフィール編集エリア ▼ */}
+        <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+          <h4 style={{ margin: '0 0 12px 0', color: '#333' }}>プロフィール設定</h4>
+          
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>表示名 (ニックネーム)</label>
+            <input 
+              type="text" 
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>よく狙うターゲット</label>
+            <select 
+              value={editFish}
+              onChange={(e) => setEditFish(e.target.value)}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px' }}
+            >
+              <option value="">選択しない</option>
+              <option value="カタクチイワシ">カタクチイワシ</option>
+              <option value="伊勢エビ">伊勢エビ</option>
+              <option value="ブリ">ブリ</option>
+            </select>
+          </div>
+
+          <button 
+            onClick={onSaveProfile}
+            style={{ background: '#0044cc', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
+          >
+            変更を保存
+          </button>
+        </div>
+
 
           {/* 2. 表示設定 (色彩テーマ設定) エリア */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

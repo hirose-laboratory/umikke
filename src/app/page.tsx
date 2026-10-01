@@ -1047,6 +1047,9 @@ export default function HeatmapPage() {
             handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount} setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
             marineTheme={marineTheme} setMarineTheme={setMarineTheme}
             fishTheme={fishTheme} setFishTheme={setFishTheme}
+            userName={userName} 
+            targetFish={targetFish} 
+            handleUpdateProfile={handleUpdateProfile}
           />
 
         </div>
