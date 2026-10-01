@@ -122,39 +122,37 @@ export default function WindyMenu({
           {isLoggedIn ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
               <div style={{ fontSize: '24px', color: '#888', fontWeight: 'bold', letterSpacing: '1px' }}>ACCOUNT</div>
+              
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#0044cc' }}>
                   account_circle
                 </span>
-                <span style={{ fontSize: '26px', color: 'white', wordBreak: 'break-all' }}>{loggedInEmail}</span>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '26px', color: 'white', fontWeight: 'bold' }}>{userName}</span>
+                  <span style={{ fontSize: '20px', color: '#aaa', wordBreak: 'break-all' }}>{loggedInEmail}</span>
+                </div>
               </div>
-              <button onClick={handleLogout} style={{ background: '#444', color: 'white', border: '1px solid #666', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
-                ログアウト
-              </button>
-              <button onClick={handleDeleteAccount} style={{ background: 'transparent', color: '#e57373', border: '1px solid #e57373', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
-                アカウントを削除
-              </button>
 
-              {/* ▼ プロフィール編集エリアをここ（ログイン中のブロック内）に移動 ▼ */}
-              <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px', marginTop: '20px' }}>
-                <h4 style={{ margin: '0 0 12px 0', color: '#333' }}>プロフィール設定</h4>
+              {/* ▼ プロフィール編集エリア ▼ */}
+              <div style={{ background: '#333333', padding: '20px', borderRadius: '12px', marginTop: '10px', border: '1px solid #444' }}>
+                <h4 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '22px' }}>プロフィール設定</h4>
                 
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>表示名 (ニックネーム)</label>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '6px' }}>表示名 (ニックネーム)</label>
                   <input 
                     type="text" 
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px', color: '#333' }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#222', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
                   />
                 </div>
 
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '4px' }}>よく狙うターゲット</label>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '6px' }}>よく狙うターゲット</label>
                   <select 
                     value={editFish}
                     onChange={(e) => setEditFish(e.target.value)}
-                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '16px', color: '#333' }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#222', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
                   >
                     <option value="">選択しない</option>
                     <option value="カタクチイワシ">カタクチイワシ</option>
@@ -165,13 +163,19 @@ export default function WindyMenu({
 
                 <button 
                   onClick={onSaveProfile}
-                  style={{ background: '#0044cc', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
+                  style={{ background: '#0044cc', color: 'white', border: 'none', padding: '14px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '20px', width: '100%' }}
                 >
                   変更を保存
                 </button>
               </div>
-              {/* ▲ プロフィール編集エリアここまで ▲ */}
+              {/* ▲ プロフィール編集エリア ▲ */}
 
+              <button onClick={handleLogout} style={{ background: '#444', color: 'white', border: '1px solid #666', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
+                ログアウト
+              </button>
+              <button onClick={handleDeleteAccount} style={{ background: 'transparent', color: '#e57373', border: '1px solid #e57373', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer' }}>
+                アカウントを削除
+              </button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '32px', borderBottom: '1px solid #444' }}>
@@ -188,8 +192,6 @@ export default function WindyMenu({
               </button>
             </div>
           )}
-
-
 
           {/* 2. 表示設定 (色彩テーマ設定) エリア */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
