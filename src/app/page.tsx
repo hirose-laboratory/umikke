@@ -843,17 +843,11 @@ export default function HeatmapPage() {
       const lng = Number(pin.longitude);
       if (!lat || !lng) return;
 
+      // 変更点：丸い図形（CIRCLE）をやめて、Google Maps標準のマップピン画像を指定
       const marker = new google.maps.Marker({
         position: { lat, lng },
         map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#8e24aa',
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 8
-        },
+        icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png', // 紫色の標準マップピン
         title: 'eDNA 観測地点'
       });
 
