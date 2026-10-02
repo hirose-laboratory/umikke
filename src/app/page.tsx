@@ -611,7 +611,7 @@ export default function HeatmapPage() {
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
-  // 9. バックエンドAPI通信 (海況 / eDNA・予測)
+  // 9. バックエンドAPI通信 (海況 / eDNA・予測 / Hotpoints)
   // ==========================================
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
@@ -621,6 +621,7 @@ export default function HeatmapPage() {
         console.log("🟡 魚種が選択されていないため、データ取得をスキップします");
         fishPointsRef.current = [];
         setEdnaPinPoints([]);
+        setHotpoints([]); // サジェストピンもクリア
         setOceanDataVersion((v) => v + 1);
         return;
       }
@@ -644,34 +645,58 @@ export default function HeatmapPage() {
         // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-          console.log(`➡️ 予測ヒートマップ fetch: ${predUrl}`);
-          return fetch(predUrl)
-            .then((res) => (res.ok ? res.json() : []))
-            .catch(() => []);
+          return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
         // 2. マップピン観測データ (/fish/{id}/edna)
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-          console.log(`➡️ 観測ピン fetch: ${pinUrl}`);
-          return fetch(pinUrl)
-            .then((res) => (res.ok ? res.json() : []))
-            .catch(() => []);
+          return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        const [predictionResults, pinResults] = await Promise.all([
+        // 3. ホットポイント（漁場候補地）データ (/fish/hotpoints/high-score)
+        // ※ ルーター定義に基づき fish_id は付与せず、期間とスコアで取得します
+        const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
+
+        // 4. サジェスト提案テキストデータ (/fish/{id}/suggestions)
+        const suggestionRequests = fishIds.map((id) => {
+          const suggestUrl = `${API_BASE_URL}/fish/${id}/suggestions`;
+          return fetch(suggestUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
+        });
+
+        // 並列で全てのリクエストを処理
+        const [predictionResults, pinResults, rawHotpoints, suggestionResults] = await Promise.all([
           Promise.all(predictionRequests),
           Promise.all(pinRequests),
+          hotpointRequest,
+          Promise.all(suggestionRequests),
         ]);
 
         const flatPred = predictionResults.flat();
         const flatPin = pinResults.flat();
+        const flatSuggestions = suggestionResults.flat();
 
+        // 取得したサジェスト提案テキストを Hotpoints と結合する（必要に応じて）
+        const enrichedHotpoints = rawHotpoints.map((hp: any) => {
+          // Hotpoint に対応する fish_id があれば、その提案を結合する
+          const suggestionObj = hp.fish_id 
+            ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
+            : null;
+          return {
+            ...hp,
+            suggestion: suggestionObj ? suggestionObj.suggestion_text : hp.suggestion,
+          };
+        });
+
+        // Ref と State にデータを格納
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
+        setHotpoints(enrichedHotpoints);
 
         console.log("✅ 魚種ヒートマップ予測データ取得完了:", flatPred);
         console.log("✅ 観測ピンデータ取得完了:", flatPin);
+        console.log("✅ サジェストHotpoints取得完了:", enrichedHotpoints);
         
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
@@ -682,9 +707,7 @@ export default function HeatmapPage() {
     fetchFishData();
   }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
 
-  // ==========================================
-  // 10. Google Maps 初期化 ＆ イベント設定
-  // ==========================================
+
   // ==========================================
   // 10. Google Maps 初期化 ＆ イベント設定
   // ==========================================
