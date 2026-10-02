@@ -131,7 +131,7 @@ export default function HeatmapPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('名無しアングラー');
-  const [targetFish, setTargetFish] = useState<string[]>([]);
+  const [targetFish, setTargetFish] = useState<string>(''); // ★ここはstringで合っています
 
   // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
@@ -227,7 +227,7 @@ export default function HeatmapPage() {
     if (!email || !password) { alert('登録するメールアドレスとパスワードを入力してください。'); return; }
     if (password.length < 6) { alert('パスワードは6文字以上で設定してください。'); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/users/register`, { // ← /register に変更
+      const res = await fetch(`${API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -286,13 +286,15 @@ export default function HeatmapPage() {
   };
 
   // プロフィールの保存とレイヤー切り替え処理
-  const handleUpdateProfile = (newName: string, newTargets: string[]) => {
+  // ★修正: 第2引数を string[] から string に変更しました
+  const handleUpdateProfile = (newName: string, newTarget: string) => {
     setUserName(newName);
-    setTargetFish(newTargets);
+    setTargetFish(newTarget);
 
     // ターゲット魚種が変更されたら、地図のレイヤーもそれに切り替える
-    if (newTargets && newTargets.length > 0) {
-      setActiveFishLayers(newTargets);
+    // ※地図描画ロジックは配列(string[])を要求するため、ここで配列に包みます
+    if (newTarget !== '') {
+      setActiveFishLayers([newTarget]);
     } else {
       setActiveFishLayers([]);
     }
@@ -303,7 +305,7 @@ export default function HeatmapPage() {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
       ...auth,
       name: newName,
-      targetFish: newTargets // 配列として保存
+      targetFish: newTarget // ★修正: 単一の文字列として保存
     }));
 
     alert('プロフィールを保存しました！');
@@ -321,14 +323,15 @@ export default function HeatmapPage() {
             
             // プロフィール情報があればStateに復元
             if (auth.name) setUserName(auth.name);
-            if (auth.targetFish && Array.isArray(auth.targetFish)) {
+
+            // ★修正: ローカルストレージからの復元処理を文字列対応に変更
+            if (typeof auth.targetFish === 'string') {
               setTargetFish(auth.targetFish);
-              // 初期表示レイヤーをターゲット魚種に自動切り替え
-              setActiveFishLayers(auth.targetFish); 
-            } else if (typeof auth.targetFish === 'string') {
-              // 過去のデータが文字列だった場合の互換性対策
-              setTargetFish([auth.targetFish]);
-              setActiveFishLayers([auth.targetFish]);
+              setActiveFishLayers(auth.targetFish !== '' ? [auth.targetFish] : []);
+            } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
+              // 過去に配列で保存されていた場合の互換性対策
+              setTargetFish(auth.targetFish[0]);
+              setActiveFishLayers([auth.targetFish[0]]);
             }
           }
         } catch {
@@ -551,21 +554,6 @@ export default function HeatmapPage() {
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           return selectedFishIds.includes(currentFishId);
-          
-          // 【修正点1】
-          // 以下の日付フィルターを一旦コメントアウト（または削除）して、
-          // 取得できたデータを日付関係なく全て強制的に表示させます。
-          /*
-          const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
-          if (!timeString) return true;
-          const safeTimeStr = timeString.replace(' ', 'T');
-          const pDate = new Date(safeTimeStr);
-          return (
-            pDate.getFullYear() === targetYear &&
-            pDate.getMonth() === targetMonth &&
-            pDate.getDate() === targetDateNum
-          );
-          */
         });
 
         // 1. その日のデータから最小値と最大値を取得してレンジを計算

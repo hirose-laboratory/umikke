@@ -18,8 +18,8 @@ interface WindyMenuProps {
   fishTheme?: string;
   setFishTheme?: (theme: string) => void;
   userName?: string;
-  targetFish?: string[]; 
-  handleUpdateProfile?: (name: string, fish: string[]) => void;
+  targetFish?: string; // ★ 配列から文字列(string)に戻す
+  handleUpdateProfile?: (name: string, fish: string) => void; // ★ 第2引数を文字列(string)に戻す
 }
 
 // ==========================================
@@ -39,11 +39,11 @@ export default function WindyMenu({
   fishTheme = 'default',
   setFishTheme,
   userName = '名無しアングラー',
-  targetFish = [], // ★ 初期値を空の配列に
+  targetFish = '', // ★ 初期値を空文字に戻す
   handleUpdateProfile
 }: WindyMenuProps) {
   const [editName, setEditName] = useState(userName);
-  const [editFish, setEditFish] = useState<string[]>(targetFish);
+  const [editFish, setEditFish] = useState<string>(targetFish); // ★ 型をstringに戻す
   
   // ▼ プロフィール編集画面（モーダル）の表示/非表示を管理するState
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -138,7 +138,7 @@ export default function WindyMenu({
                 </div>
               </div>
 
-              {/* ▼ プロフィール編集を開くボタン（ログアウトとの間に大きな余白を持たせる） ▼ */}
+              {/* ▼ プロフィール編集を開くボタン */}
               <button 
                 onClick={() => setShowProfileModal(true)}
                 style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px', borderRadius: '24px', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', marginTop: '40px', marginBottom: '20px' }}
@@ -248,26 +248,28 @@ export default function WindyMenu({
               <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット（1つのみ選択）</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a' }}>
                 
-                {/* 選択解除用のラジオボタン */}
+                {/* ★ 選択解除用のラジオボタン */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                   <input 
                     type="radio" 
                     name="targetFishSelection"
-                    checked={editFish.length === 0} // 配列が空ならチェック
-                    onChange={() => setEditFish([])} // 空の配列をセット（選択解除）
+                    value=""
+                    checked={editFish === ''} // 文字列の完全一致で判定
+                    onChange={() => setEditFish('')} // 空文字をセット
                     style={{ width: '24px', height: '24px', cursor: 'pointer' }}
                   />
                   選択しない
                 </label>
 
-                {/* 3つの魚種ラジオボタン */}
+                {/* ★ 3つの魚種ラジオボタン */}
                 {['カタクチイワシ', '伊勢エビ', 'ブリ'].map((fishName) => (
                   <label key={fishName} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                     <input 
                       type="radio" 
-                      name="targetFishSelection" // nameを統一することでグループ化し、1つしか選べなくする
-                      checked={editFish.includes(fishName)}
-                      onChange={() => setEditFish([fishName])} // 選んだ魚種1つだけの配列で上書きする
+                      name="targetFishSelection"
+                      value={fishName}
+                      checked={editFish === fishName} // 文字列の完全一致で判定
+                      onChange={() => setEditFish(fishName)} // 選んだ魚種の文字列をセット
                       style={{ width: '24px', height: '24px', cursor: 'pointer' }}
                     />
                     {fishName}
