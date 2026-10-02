@@ -18,8 +18,8 @@ interface WindyMenuProps {
   fishTheme?: string;
   setFishTheme?: (theme: string) => void;
   userName?: string;
-  targetFish?: string; // ★ 配列から文字列(string)に戻す
-  handleUpdateProfile?: (name: string, fish: string) => void; // ★ 第2引数を文字列(string)に戻す
+  targetFish?: string;
+  handleUpdateProfile?: (name: string, fish: string) => void;
 }
 
 // ==========================================
@@ -39,11 +39,11 @@ export default function WindyMenu({
   fishTheme = 'default',
   setFishTheme,
   userName = '名無しアングラー',
-  targetFish = '', // ★ 初期値を空文字に戻す
+  targetFish = '',
   handleUpdateProfile
 }: WindyMenuProps) {
   const [editName, setEditName] = useState(userName);
-  const [editFish, setEditFish] = useState<string>(targetFish); // ★ 型をstringに戻す
+  const [editFish, setEditFish] = useState<string>(targetFish);
   
   // ▼ プロフィール編集画面（モーダル）の表示/非表示を管理するState
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -254,8 +254,8 @@ export default function WindyMenu({
                     type="radio" 
                     name="targetFishSelection"
                     value=""
-                    checked={editFish === ''} // 文字列の完全一致で判定
-                    onChange={() => setEditFish('')} // 空文字をセット
+                    checked={editFish === ''} 
+                    onChange={() => setEditFish('')} 
                     style={{ width: '24px', height: '24px', cursor: 'pointer' }}
                   />
                   選択しない
@@ -268,8 +268,8 @@ export default function WindyMenu({
                       type="radio" 
                       name="targetFishSelection"
                       value={fishName}
-                      checked={editFish === fishName} // 文字列の完全一致で判定
-                      onChange={() => setEditFish(fishName)} // 選んだ魚種の文字列をセット
+                      checked={editFish === fishName} 
+                      onChange={() => setEditFish(fishName)} 
                       style={{ width: '24px', height: '24px', cursor: 'pointer' }}
                     />
                     {fishName}

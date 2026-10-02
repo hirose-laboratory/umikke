@@ -159,6 +159,8 @@ export default function HeatmapPage() {
     });
   }, []);
 
+  
+
   const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveFishLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
