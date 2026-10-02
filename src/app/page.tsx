@@ -686,10 +686,11 @@ export default function HeatmapPage() {
       console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
 
       try {
-        // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
-        // 404エラーになっても全体を止めず、空配列を返すように修正
+        // 1. ヒートマップ予測データ (/fish/{id}/prediction または /fish/{id}/edna)
+        // エンドポイントが存在しない場合でも404で落とさず安全に空配列を返す
         const predictionRequests = fishIds.map((id) => {
-          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?date=${targetDateStr}`;
+          // バックエンドの予測エンドポイント名に合わせて変更 (例: /fish/${id}/prediction や /fish/${id}/edna)
+          const predUrl = `${API_BASE_URL}/fish/${id}/prediction?date=${targetDateStr}`;
           console.log(`➡️ 予測ヒートマップ fetch: ${predUrl}`);
           return fetch(predUrl)
             .then((res) => (res.ok ? res.json() : []))
@@ -697,7 +698,6 @@ export default function HeatmapPage() {
         });
 
         // 2. マップピン観測データ (/fish/{id}/edna)
-        // 元々ヒートマップで使っていたAPIをピン用として取得
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
           console.log(`➡️ 観測ピン fetch: ${pinUrl}`);
@@ -711,11 +711,14 @@ export default function HeatmapPage() {
           Promise.all(pinRequests),
         ]);
 
-        fishPointsRef.current = predictionResults.flat();
-        setEdnaPinPoints(pinResults.flat());
+        const flatPred = predictionResults.flat();
+        const flatPin = pinResults.flat();
 
-        console.log("✅ 魚種ヒートマップ予測データ取得完了:", fishPointsRef.current);
-        console.log("✅ 観測ピンデータ取得完了:", ednaPinPoints);
+        fishPointsRef.current = flatPred;
+        setEdnaPinPoints(flatPin);
+
+        console.log("✅ 魚種ヒートマップ予測データ取得完了:", flatPred);
+        console.log("✅ 観測ピンデータ取得完了:", flatPin);
         
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
@@ -743,7 +746,7 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization&loading=async`;
       newScript.async = true; newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
       newScript.onerror = () => { if (!cancelled) setMapLoadError('スクリプト読み込みに失敗しました。'); };
@@ -843,11 +846,10 @@ export default function HeatmapPage() {
       const lng = Number(pin.longitude);
       if (!lat || !lng) return;
 
-      // 変更点：丸い図形（CIRCLE）をやめて、Google Maps標準のマップピン画像を指定
       const marker = new google.maps.Marker({
         position: { lat, lng },
         map: map,
-        icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png', // 紫色の標準マップピン
+        icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png',
         title: 'eDNA 観測地点'
       });
 
