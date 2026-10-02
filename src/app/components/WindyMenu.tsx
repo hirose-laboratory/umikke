@@ -18,8 +18,8 @@ interface WindyMenuProps {
   fishTheme?: string;
   setFishTheme?: (theme: string) => void;
   userName?: string;
-  targetFish?: string;
-  handleUpdateProfile?: (name: string, fish: string) => void;
+  targetFish?: string[]; 
+  handleUpdateProfile?: (name: string, fish: string[]) => void;
 }
 
 // ==========================================
@@ -39,11 +39,11 @@ export default function WindyMenu({
   fishTheme = 'default',
   setFishTheme,
   userName = '名無しアングラー',
-  targetFish = '',
+  targetFish = [], // ★ 初期値を空の配列に
   handleUpdateProfile
 }: WindyMenuProps) {
   const [editName, setEditName] = useState(userName);
-  const [editFish, setEditFish] = useState(targetFish);
+  const [editFish, setEditFish] = useState<string[]>(targetFish);
   
   // ▼ プロフィール編集画面（モーダル）の表示/非表示を管理するState
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -245,17 +245,28 @@ export default function WindyMenu({
             </div>
 
             <div style={{ marginBottom: '32px' }}>
-              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット</label>
-              <select 
-                value={editFish}
-                onChange={(e) => setEditFish(e.target.value)}
-                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
-              >
-                <option value="">選択しない</option>
-                <option value="カタクチイワシ">カタクチイワシ</option>
-                <option value="伊勢エビ">伊勢エビ</option>
-                <option value="ブリ">ブリ</option>
-              </select>
+              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット（複数選択可）</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a' }}>
+                {['カタクチイワシ', '伊勢エビ', 'ブリ'].map((fishName) => (
+                  <label key={fishName} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={editFish.includes(fishName)} // 配列の中に魚種が含まれていればチェックを入れる
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // チェックされたら配列に追加
+                          setEditFish([...editFish, fishName]);
+                        } else {
+                          // チェックが外れたら配列から削除
+                          setEditFish(editFish.filter(f => f !== fishName));
+                        }
+                      }}
+                      style={{ width: '24px', height: '24px' }}
+                    />
+                    {fishName}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <button 

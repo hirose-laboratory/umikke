@@ -131,7 +131,7 @@ export default function HeatmapPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('名無しアングラー');
-  const [targetFish, setTargetFish] = useState<string>('');
+  const [targetFish, setTargetFish] = useState<string[]>([]);
 
   // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
@@ -286,13 +286,15 @@ export default function HeatmapPage() {
   };
 
   // プロフィールの保存とレイヤー切り替え処理
-  const handleUpdateProfile = (newName: string, newTarget: string) => {
+  const handleUpdateProfile = (newName: string, newTargets: string[]) => {
     setUserName(newName);
-    setTargetFish(newTarget);
+    setTargetFish(newTargets);
 
     // ターゲット魚種が変更されたら、地図のレイヤーもそれに切り替える
-    if (newTarget) {
-      setActiveFishLayers([newTarget]);
+    if (newTargets && newTargets.length > 0) {
+      setActiveFishLayers(newTargets);
+    } else {
+      setActiveFishLayers([]);
     }
 
     // ローカルストレージ内のデータを上書き保存
@@ -301,7 +303,7 @@ export default function HeatmapPage() {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
       ...auth,
       name: newName,
-      targetFish: newTarget
+      targetFish: newTargets // 配列として保存
     }));
 
     alert('プロフィールを保存しました！');
@@ -319,10 +321,14 @@ export default function HeatmapPage() {
             
             // プロフィール情報があればStateに復元
             if (auth.name) setUserName(auth.name);
-            if (auth.targetFish) {
+            if (auth.targetFish && Array.isArray(auth.targetFish)) {
               setTargetFish(auth.targetFish);
               // 初期表示レイヤーをターゲット魚種に自動切り替え
-              setActiveFishLayers([auth.targetFish]); 
+              setActiveFishLayers(auth.targetFish); 
+            } else if (typeof auth.targetFish === 'string') {
+              // 過去のデータが文字列だった場合の互換性対策
+              setTargetFish([auth.targetFish]);
+              setActiveFishLayers([auth.targetFish]);
             }
           }
         } catch {
@@ -600,8 +606,9 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 25, 
-          maxIntensity: 100, 
+          radius: 50,          // 円を大きくする
+          maxIntensity: 25,    // 基準値を下げて低い数値でも濃くする
+          opacity: 0.9,        // 不透明度を上げる
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
