@@ -732,6 +732,9 @@ export default function HeatmapPage() {
   // ==========================================
   // 10. Google Maps 初期化 ＆ イベント設定
   // ==========================================
+  // ==========================================
+  // 10. Google Maps 初期化 ＆ イベント設定
+  // ==========================================
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
     if (!apiKey) {
@@ -746,8 +749,9 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization`;
-      newScript.async = true; newScript.defer = true;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=weekly`;
+      newScript.async = true; 
+      newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
       newScript.onerror = () => { if (!cancelled) setMapLoadError('スクリプト読み込みに失敗しました。'); };
       document.head.appendChild(newScript);
@@ -757,77 +761,89 @@ export default function HeatmapPage() {
       script.onload = () => { if (!cancelled) initMap(); };
     }
 
-    function initMap() {
+    // async 関数に変更
+    async function initMap() {
       if (!mapRef.current) return;
       if (typeof window === 'undefined' || !window.google || !window.google.maps) return;
       
       const google = window.google;
-      const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 34.420, lng: 136.880 }, zoom: 11, mapTypeId: 'roadmap',
-        styles: [
-          { elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-          { featureType: 'road', stylers: [{ visibility: 'off' }] }
-        ], disableDefaultUI: true,
-      });
-      mapInstanceRef.current = map;
 
-      const customGradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
-      heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [], map: map, gradient: customGradient, radius: 20, opacity: 0.85
-      });
+      try {
+        // ★ 必要なライブラリクラスを明示的にロードする
+        const { Map } = await google.maps.importLibrary("maps") as any;
+        const { HeatmapLayer } = await google.maps.importLibrary("visualization") as any;
 
-      fishHeatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-        data: [], map: map, radius: 25, opacity: 0.85
-      });
-      
-      infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
+        const map = new Map(mapRef.current, {
+          center: { lat: 34.420, lng: 136.880 }, zoom: 11, mapTypeId: 'roadmap',
+          styles: [
+            { elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+            { featureType: 'road', stylers: [{ visibility: 'off' }] }
+          ], disableDefaultUI: true,
+        });
+        mapInstanceRef.current = map;
 
-      map.addListener('click', (e: any) => {
-        const clickLat = e.latLng.lat();
-        const clickLng = e.latLng.lng();
+        const customGradient = [ 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 255, 1.0)', 'rgba(0, 255, 255, 1.0)', 'rgba(0, 255, 0, 1.0)', 'rgba(255, 255, 0, 1.0)', 'rgba(255, 165, 0, 1.0)', 'rgba(255, 0, 0, 1.0)' ];
         
-        const targetDate = selectedFullDateRef.current;
-        const targetYear = targetDate.getFullYear();
-        const targetMonth = targetDate.getMonth();
-        const targetDateNum = targetDate.getDate();
-
-        const todayPoints = oceanPointsRef.current.filter((p) => {
-          if (p.sst === null || p.sst === undefined) return false;
-          const pDate = new Date(p.record_timestamp);
-          return (pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum);
+        heatmapLayerRef.current = new HeatmapLayer({
+          data: [], map: map, gradient: customGradient, radius: 20, opacity: 0.85
         });
 
-        if (todayPoints.length === 0) return;
-
-        let nearestPoint = todayPoints[0];
-        let minDistance = Number.MAX_VALUE;
-        for (const p of todayPoints) {
-          const dist = Math.pow(p.latitude - clickLat, 2) + Math.pow(p.longitude - clickLng, 2);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestPoint = p;
-          }
-        }
-
-        if (minDistance > 0.05) return;
-
-        const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        fishHeatmapLayerRef.current = new HeatmapLayer({
+          data: [], map: map, radius: 25, opacity: 0.85
+        });
         
-        infoWindowRef.current?.setContent(`
-          <div style="padding: 12px; color: #333; font-size: 16px;">
-            <strong style="font-size: 18px; color: #0044cc;">観測ポイント詳細</strong><br/>
-            水温: <b>${nearestPoint.sst?.toFixed(1)} ℃</b><br/>
-            取得時間: ${timeStr}<br/>
-            <span style="font-size: 12px; color: #666;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</span>
-          </div>
-        `);
-        infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
-        infoWindowRef.current?.open(map);
-      });
+        infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
-      setMapReady(true);
+        map.addListener('click', (e: any) => {
+          const clickLat = e.latLng.lat();
+          const clickLng = e.latLng.lng();
+          
+          const targetDate = selectedFullDateRef.current;
+          const targetYear = targetDate.getFullYear();
+          const targetMonth = targetDate.getMonth();
+          const targetDateNum = targetDate.getDate();
+
+          const todayPoints = oceanPointsRef.current.filter((p) => {
+            if (p.sst === null || p.sst === undefined) return false;
+            const pDate = new Date(p.record_timestamp);
+            return (pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum);
+          });
+
+          if (todayPoints.length === 0) return;
+
+          let nearestPoint = todayPoints[0];
+          let minDistance = Number.MAX_VALUE;
+          for (const p of todayPoints) {
+            const dist = Math.pow(p.latitude - clickLat, 2) + Math.pow(p.longitude - clickLng, 2);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearestPoint = p;
+            }
+          }
+
+          if (minDistance > 0.05) return;
+
+          const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          
+          infoWindowRef.current?.setContent(`
+            <div style="padding: 12px; color: #333; font-size: 16px;">
+              <strong style="font-size: 18px; color: #0044cc;">観測ポイント詳細</strong><br/>
+              水温: <b>${nearestPoint.sst?.toFixed(1)} ℃</b><br/>
+              取得時間: ${timeStr}<br/>
+              <span style="font-size: 12px; color: #666;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</span>
+            </div>
+          `);
+          infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
+          infoWindowRef.current?.open(map);
+        });
+
+        setMapReady(true);
+      } catch (err) {
+        console.error("Map initialization failed:", err);
+        setMapLoadError("地図の初期化に失敗しました。");
+      }
     }
     return () => { cancelled = true; };
   }, []);
