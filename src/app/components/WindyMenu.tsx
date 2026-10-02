@@ -220,16 +220,51 @@ export default function WindyMenu({
           3. プロフィール編集用ポップアップモーダル
       ========================================== */}
       {showProfileModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 4000,
-          display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <div style={{ background: '#2a2a2a', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '450px', border: '1px solid #555', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div 
+          // ★ 地図へのイベント貫通（ドラッグ・クリック）を完全に防ぐ処理を追加
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)', 
+            zIndex: 99999, // ★ 地図コンテナより確実に全面に出す
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            pointerEvents: 'auto', // ★ イベントをこの要素で受け止める
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ 
+              background: '#2a2a2a', 
+              padding: '32px', 
+              borderRadius: '16px', 
+              width: '90%', 
+              maxWidth: '450px', 
+              border: '1px solid #555', 
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              pointerEvents: 'auto',
+            }}
+          >
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h3 style={{ margin: 0, color: 'white', fontSize: '24px' }}>プロフィール編集</h3>
-              <button onClick={() => setShowProfileModal(false)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex' }}>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProfileModal(false);
+                }} 
+                style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex' }}
+              >
                 <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>close</span>
               </button>
             </div>
@@ -240,6 +275,7 @@ export default function WindyMenu({
                 type="text" 
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
+                onFocus={(e) => e.stopPropagation()}
                 style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a', color: 'white', fontSize: '20px', boxSizing: 'border-box' }}
               />
             </div>
@@ -248,7 +284,7 @@ export default function WindyMenu({
               <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット（1つのみ選択）</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a' }}>
                 
-                {/* ★ 選択解除用のラジオボタン */}
+                {/* 選択解除用のラジオボタン */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                   <input 
                     type="radio" 
@@ -261,7 +297,7 @@ export default function WindyMenu({
                   選択しない
                 </label>
 
-                {/* ★ 3つの魚種ラジオボタン */}
+                {/* 3つの魚種ラジオボタン */}
                 {['カタクチイワシ', '伊勢エビ', 'ブリ'].map((fishName) => (
                   <label key={fishName} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                     <input 
@@ -279,7 +315,11 @@ export default function WindyMenu({
             </div>
 
             <button 
-              onClick={onSaveProfile}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSaveProfile();
+              }}
               style={{ background: '#0044cc', color: 'white', border: 'none', padding: '16px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '20px', width: '100%' }}
             >
               変更を保存
