@@ -159,6 +159,23 @@ export default function HeatmapPage() {
     });
   }, []);
 
+  const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
+    setActiveFishLayers((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      
+      // 新しく選択された（追加された）項目を抽出
+      const added = next.filter((item) => !prev.includes(item));
+      
+      // 新しい選択があれば、それ「1つだけ」を配列にして返す（他の選択を外す）
+      if (added.length > 0) {
+        return [added[added.length - 1]];
+      }
+      
+      // 選択が解除された場合などはそのまま反映
+      return next;
+    });
+  }, []);
+
   // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
@@ -971,7 +988,7 @@ export default function HeatmapPage() {
             showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
             showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
             activeMarineLayers={activeMarineLayers} setActiveMarineLayers={handleMarineLayersUpdate}
-            activeFishLayers={activeFishLayers} setActiveFishLayers={setActiveFishLayers}
+            activeFishLayers={activeFishLayers} setActiveFishLayers={handleFishLayersUpdate}
           />
 
           {/* 左下動的凡例 */}
