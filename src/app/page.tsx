@@ -749,7 +749,7 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=weekly`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=3.64`;
       newScript.async = true; 
       newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
