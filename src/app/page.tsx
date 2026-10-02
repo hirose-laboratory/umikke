@@ -687,23 +687,23 @@ export default function HeatmapPage() {
 
       try {
         // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
+        // 404エラーになっても全体を止めず、空配列を返すように修正
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?date=${targetDateStr}`;
           console.log(`➡️ 予測ヒートマップ fetch: ${predUrl}`);
-          return fetch(predUrl).then((res) => {
-            if (!res.ok) throw new Error(`Prediction Status ${res.status}`);
-            return res.json();
-          });
+          return fetch(predUrl)
+            .then((res) => (res.ok ? res.json() : []))
+            .catch(() => []);
         });
 
         // 2. マップピン観測データ (/fish/{id}/edna)
+        // 元々ヒートマップで使っていたAPIをピン用として取得
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
           console.log(`➡️ 観測ピン fetch: ${pinUrl}`);
-          return fetch(pinUrl).then((res) => {
-            if (!res.ok) throw new Error(`Edna Pin Status ${res.status}`);
-            return res.json();
-          });
+          return fetch(pinUrl)
+            .then((res) => (res.ok ? res.json() : []))
+            .catch(() => []);
         });
 
         const [predictionResults, pinResults] = await Promise.all([
@@ -715,11 +715,11 @@ export default function HeatmapPage() {
         setEdnaPinPoints(pinResults.flat());
 
         console.log("✅ 魚種ヒートマップ予測データ取得完了:", fishPointsRef.current);
-        console.log("✅ 観測ピンデータ取得完了:", pinResults.flat());
+        console.log("✅ 観測ピンデータ取得完了:", ednaPinPoints);
         
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
-        console.error('❌ 魚種データの取得に失敗しました:', err);
+        console.error('❌ 魚種データの予期せぬエラー:', err);
       }
     }
 
