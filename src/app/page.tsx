@@ -846,15 +846,12 @@ export default function HeatmapPage() {
       const lng = Number(pin.longitude);
       if (!lat || !lng) return;
 
-  const marker = new google.maps.Marker({
-  position: { lat, lng },
-  map: map,
-  icon: {
-    url: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-    scaledSize: new google.maps.Size(48, 48), // ← 希望のサイズ [幅, 高さ] に指定（例: 48x48）
-  },
-  title: 'eDNA 観測地点'
-});
+      const marker = new google.maps.Marker({
+        position: { lat, lng },
+        map: map,
+        icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+        title: 'eDNA 観測地点'
+      });
 
       marker.addListener('click', () => {
         if (infoWindowRef.current) {
