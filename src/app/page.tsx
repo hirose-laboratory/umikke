@@ -614,55 +614,6 @@ export default function HeatmapPage() {
   // 9. バックエンドAPI通信 (海況 / eDNA・予測)
   // ==========================================
   useEffect(() => {
-    console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
-
-    let cancelled = false;
-    async function fetchOceanData() {
-      try {
-        const year = selectedFullDate.getFullYear();
-        const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
-        const day = String(selectedFullDate.getDate()).padStart(2, '0');
-        
-        const start = `${year}-${month}-${day}T00:00:00`;
-        const end = `${year}-${month}-${day}T23:59:59`;
-
-        const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-        
-        console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
-        
-        const data: OceanDataPoint[] = await res.json();
-        if (cancelled) return;
-        
-        oceanPointsRef.current = data;
-        setOceanPointCount(data.length);
-        setOceanDataVersion((v) => v + 1);
-
-        console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`);
-
-      } catch (err) {
-        console.error('❌ 海上状況データの取得に失敗しました:', err);
-        
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
-          setOceanError(message);
-        }
-      } finally {
-        if (!cancelled) setOceanLoading(false);
-      }
-    }
-
-    setOceanLoading(true);
-    setOceanError(null);
-    fetchOceanData();
-
-    return () => { cancelled = true; };
-  }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
-  
-  // 魚種データ (ヒートマップ予測データとマップピンデータの2系統を取得)
-  useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
 
     async function fetchFishData() {
@@ -683,14 +634,16 @@ export default function HeatmapPage() {
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
       const targetDateStr = `${year}-${month}-${day}`;
 
-      console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
+      // バックエンドの datetime パラメータに合わせて ISO 形式の開始・終了日時を作成
+      const start = `${targetDateStr}T00:00:00`;
+      const end = `${targetDateStr}T23:59:59`;
+
+      console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 期間=${start} ~ ${end}`);
 
       try {
-        // 1. ヒートマップ予測データ (/fish/{id}/prediction または /fish/{id}/edna)
-        // エンドポイントが存在しない場合でも404で落とさず安全に空配列を返す
+        // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
         const predictionRequests = fishIds.map((id) => {
-          // バックエンドの予測エンドポイント名に合わせて変更 (例: /fish/${id}/prediction や /fish/${id}/edna)
-          const predUrl = `${API_BASE_URL}/fish/${id}/prediction?date=${targetDateStr}`;
+          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           console.log(`➡️ 予測ヒートマップ fetch: ${predUrl}`);
           return fetch(predUrl)
             .then((res) => (res.ok ? res.json() : []))
@@ -699,7 +652,7 @@ export default function HeatmapPage() {
 
         // 2. マップピン観測データ (/fish/{id}/edna)
         const pinRequests = fishIds.map((id) => {
-          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
+          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           console.log(`➡️ 観測ピン fetch: ${pinUrl}`);
           return fetch(pinUrl)
             .then((res) => (res.ok ? res.json() : []))
