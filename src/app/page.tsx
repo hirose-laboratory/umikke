@@ -746,7 +746,7 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=3.64&libraries=visualization&loading=async`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization`;
       newScript.async = true; newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
       newScript.onerror = () => { if (!cancelled) setMapLoadError('スクリプト読み込みに失敗しました。'); };
