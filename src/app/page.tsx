@@ -131,7 +131,7 @@ export default function HeatmapPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('名無しアングラー');
-  const [targetFish, setTargetFish] = useState<string>(''); // ★ここはstringで合っています
+  const [targetFish, setTargetFish] = useState<string>(''); 
 
   // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
@@ -159,21 +159,13 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  
-
   const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveFishLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
-      
-      // 新しく選択された（追加された）項目を抽出
       const added = next.filter((item) => !prev.includes(item));
-      
-      // 新しい選択があれば、それ「1つだけ」を配列にして返す（他の選択を外す）
       if (added.length > 0) {
         return [added[added.length - 1]];
       }
-      
-      // 選択が解除された場合などはそのまま反映
       return next;
     });
   }, []);
@@ -305,26 +297,22 @@ export default function HeatmapPage() {
   };
 
   // プロフィールの保存とレイヤー切り替え処理
-  // ★修正: 第2引数を string[] から string に変更しました
   const handleUpdateProfile = (newName: string, newTarget: string) => {
     setUserName(newName);
     setTargetFish(newTarget);
 
-    // ターゲット魚種が変更されたら、地図のレイヤーもそれに切り替える
-    // ※地図描画ロジックは配列(string[])を要求するため、ここで配列に包みます
     if (newTarget !== '') {
       setActiveFishLayers([newTarget]);
     } else {
       setActiveFishLayers([]);
     }
 
-    // ローカルストレージ内のデータを上書き保存
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     const auth = stored ? JSON.parse(stored) : {};
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
       ...auth,
       name: newName,
-      targetFish: newTarget // ★修正: 単一の文字列として保存
+      targetFish: newTarget 
     }));
 
     alert('プロフィールを保存しました！');
@@ -340,15 +328,12 @@ export default function HeatmapPage() {
             setIsLoggedIn(true); 
             setLoggedInEmail(auth.email); 
             
-            // プロフィール情報があればStateに復元
             if (auth.name) setUserName(auth.name);
 
-            // ★修正: ローカルストレージからの復元処理を文字列対応に変更
             if (typeof auth.targetFish === 'string') {
               setTargetFish(auth.targetFish);
               setActiveFishLayers(auth.targetFish !== '' ? [auth.targetFish] : []);
             } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
-              // 過去に配列で保存されていた場合の互換性対策
               setTargetFish(auth.targetFish[0]);
               setActiveFishLayers([auth.targetFish[0]]);
             }
@@ -405,15 +390,11 @@ export default function HeatmapPage() {
       return ( pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum );
     });
 
-    // 海況ヒートマップ (水温・クロロフィル)
     if (heatmapLayerRef.current) {
       const hasSst = activeMarineLayers.includes('sst');
       const hasChl = activeMarineLayers.includes('chl');
 
       if ((hasSst || hasChl) && todayPoints.length > 0) {
-        // ----------------------------------------------------
-        // 1. 本日データの最小値 (min) ・ 最大値 (max) を抽出
-        // ----------------------------------------------------
         const sstValues = todayPoints
           .map((p) => (p.sst !== null && p.sst !== undefined ? Number(p.sst) : null))
           .filter((v): v is number => v !== null && !isNaN(v));
@@ -433,16 +414,12 @@ export default function HeatmapPage() {
         const maxChl = chlValues.length > 0 ? Math.max(...chlValues) : 0;
         const chlRange = maxChl - minChl;
 
-        // ----------------------------------------------------
-        // 2. 最小〜最大の中で 0〜100 に動的スケール変換 (weight計算)
-        // ----------------------------------------------------
         const heatPoints = todayPoints.map((p) => {
           let normalizedSst = 0;
           let normalizedChl = 0;
 
           if (hasSst && p.sst !== null && p.sst !== undefined) {
             const val = Number(p.sst);
-            // 範囲差がある場合は 0〜100 に換算（範囲がない場合は中央値50）
             normalizedSst = sstRange > 0 ? ((val - minSst) / sstRange) * 100 : 50;
           }
 
@@ -465,9 +442,6 @@ export default function HeatmapPage() {
           };
         });
 
-        // ----------------------------------------------------
-        // 3. テーマごとのグラデーション定義
-        // ----------------------------------------------------
         let gradient = null;
         if (marineTheme === 'rainbow') {
           gradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
@@ -497,13 +471,9 @@ export default function HeatmapPage() {
         }
 
         heatmapLayerRef.current.setData(heatPoints);
-        
-        // ----------------------------------------------------
-        // 4. 表示オプション設定
-        // ----------------------------------------------------
         heatmapLayerRef.current.setOptions({ 
-          maxIntensity: 100, // 0〜100に規格化しているため100固定で常にフルスケール表示
-          radius: 45,        // 点同士が太く綺麗につながるサイズ
+          maxIntensity: 100, 
+          radius: 45,        
           gradient: gradient
         });
       } else {
@@ -511,7 +481,6 @@ export default function HeatmapPage() {
       }
     }
 
-    // 流向・流速ベクトル (矢印)
     arrowMarkersRef.current.forEach(marker => marker.setMap(null));
     arrowMarkersRef.current = [];
 
@@ -562,7 +531,6 @@ export default function HeatmapPage() {
       }
     }
 
-    // 魚種分布 (eDNA予測) ヒートマップ
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
@@ -575,7 +543,6 @@ export default function HeatmapPage() {
           return selectedFishIds.includes(currentFishId);
         });
 
-        // 1. その日のデータから最小値と最大値を取得してレンジを計算
         const fishValues = targetFishPoints
           .map((p: any) => Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 0))
           .filter((v: number) => !isNaN(v) && v > 0);
@@ -589,7 +556,6 @@ export default function HeatmapPage() {
           const lat = Number(p?.latitude ?? p?.lat ?? 0);
           const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
-          // 最小値が0になって透明化してしまうのを防ぎます
           const normalizedWeight = fishValRange > 0 
             ? ((rawVal - minFishVal) / fishValRange) * 80 + 20 
             : 50;
@@ -599,7 +565,6 @@ export default function HeatmapPage() {
             weight: normalizedWeight,
           };
         });
-
 
         let fishGradient: string[];
         if (fishTheme === 'rainbow') {
@@ -613,16 +578,15 @@ export default function HeatmapPage() {
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 50,          // 円を大きくする
-          maxIntensity: 25,    // 基準値を下げて低い数値でも濃くする
-          opacity: 0.9,        // 不透明度を上げる
+          radius: 50,          
+          maxIntensity: 25,    
+          opacity: 0.9,        
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
       }
     }
   }, [selectedFullDate, activeMarineLayers, activeFishLayers, marineTheme, fishTheme]);
-
 
   useEffect(() => {
     if (!mapReady) return;
@@ -632,10 +596,7 @@ export default function HeatmapPage() {
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA)
   // ==========================================
-  
-  // 海上状況データ（OceanData）を取得
   useEffect(() => {
-    // 🟢 起動時ログ
     console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
 
     let cancelled = false;
@@ -650,7 +611,6 @@ export default function HeatmapPage() {
 
         const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
         
-        // 🔵 リクエスト前ログ
         console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
         console.log(`➡️ fetch実行: ${url}`);
 
@@ -664,11 +624,9 @@ export default function HeatmapPage() {
         setOceanPointCount(data.length);
         setOceanDataVersion((v) => v + 1);
 
-        // ✅ 成功ログ
         console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`, data);
 
       } catch (err) {
-        // ❌ エラーログ
         console.error('❌ 海上状況データの取得に失敗しました:', err);
         
         if (!cancelled) {
@@ -687,8 +645,6 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
   
-
-  // 魚種(eDNA)データ取得 (1, 2, 3 の個別IDでリクエスト)
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
 
@@ -700,7 +656,6 @@ export default function HeatmapPage() {
         return;
       }
 
-      // 選択された魚種からそれぞれの正確な固有ID（重複除去）を取得
       const fishIds: number[] = Array.from(
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
@@ -837,7 +792,6 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // 漁場サジェストマーカー描画
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -944,34 +898,20 @@ export default function HeatmapPage() {
         {/* 地図キャンバス */}
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
-        {/* メインUIオーバーレイ */}
+        {/* ▽▽▽ 修正ポイント: pointer-events: none の影響を受けるコンテナ ▽▽▽ */}
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
 
           {/* ヘッダーロゴ */}
           <div style={{
-            position: 'absolute',
-            top: '25px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 20,
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            position: 'absolute', top: '25px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
             <img 
               src="/site-logo.png" 
               alt="サイトロゴ" 
               style={{ 
-                height: '70px', 
-                width: 'auto',
-                filter: `
-                  drop-shadow(2px 0 0 #ffffff) 
-                  drop-shadow(-2px 0 0 #ffffff) 
-                  drop-shadow(0 2px 0 #ffffff) 
-                  drop-shadow(0 -2px 0 #ffffff) 
-                  drop-shadow(0 3px 6px rgba(0, 30, 60, 0.5))
-                `
+                height: '70px', width: 'auto',
+                filter: `drop-shadow(2px 0 0 #ffffff) drop-shadow(-2px 0 0 #ffffff) drop-shadow(0 2px 0 #ffffff) drop-shadow(0 -2px 0 #ffffff) drop-shadow(0 3px 6px rgba(0, 30, 60, 0.5))`
               }} 
             />
           </div>
@@ -1051,28 +991,30 @@ export default function HeatmapPage() {
 
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
-
-          {/* ログイン・新規登録モーダル */}
-          {showLoginModal && (
-            <LoginModal
-              setShowLoginModal={setShowLoginModal} isSignUp={isSignUp} setIsSignUp={setIsSignUp}
-              email={email} setEmail={setEmail} password={password} setPassword={setPassword}
-              handleRegisterSubmit={handleRegisterSubmit} handleEmailLogin={handleEmailLogin}
-            />
-          )}
-
-          {/* マイページ・テーマ設定メニュー */}
-          <WindyMenu
-            showWindyMenu={showWindyMenu} setShowWindyMenu={setShowWindyMenu} isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail}
-            handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount} setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
-            marineTheme={marineTheme} setMarineTheme={setMarineTheme}
-            fishTheme={fishTheme} setFishTheme={setFishTheme}
-            userName={userName} 
-            targetFish={targetFish} 
-            handleUpdateProfile={handleUpdateProfile}
-          />
-
         </div>
+
+        {/* ★★★ 修正ポイント: モーダル・メニュー類を ui-container(pointer-events:none) の【外側】へ移動しました ★★★ */}
+        
+        {/* ログイン・新規登録モーダル */}
+        {showLoginModal && (
+          <LoginModal
+            setShowLoginModal={setShowLoginModal} isSignUp={isSignUp} setIsSignUp={setIsSignUp}
+            email={email} setEmail={setEmail} password={password} setPassword={setPassword}
+            handleRegisterSubmit={handleRegisterSubmit} handleEmailLogin={handleEmailLogin}
+          />
+        )}
+
+        {/* マイページ・テーマ設定メニュー */}
+        <WindyMenu
+          showWindyMenu={showWindyMenu} setShowWindyMenu={setShowWindyMenu} isLoggedIn={isLoggedIn} loggedInEmail={loggedInEmail}
+          handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount} setIsSignUp={setIsSignUp} setShowLoginModal={setShowLoginModal}
+          marineTheme={marineTheme} setMarineTheme={setMarineTheme}
+          fishTheme={fishTheme} setFishTheme={setFishTheme}
+          userName={userName} 
+          targetFish={targetFish} 
+          handleUpdateProfile={handleUpdateProfile}
+        />
+
       </div>
     </>
   );
