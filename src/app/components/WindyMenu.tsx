@@ -245,23 +245,30 @@ export default function WindyMenu({
             </div>
 
             <div style={{ marginBottom: '32px' }}>
-              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット（複数選択可）</label>
+              <label style={{ display: 'block', fontSize: '18px', color: '#ccc', marginBottom: '8px' }}>よく狙うターゲット（1つのみ選択）</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', borderRadius: '8px', border: '1px solid #555', backgroundColor: '#1a1a1a' }}>
+                
+                {/* 選択解除用のラジオボタン */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="targetFishSelection"
+                    checked={editFish.length === 0} // 配列が空ならチェック
+                    onChange={() => setEditFish([])} // 空の配列をセット（選択解除）
+                    style={{ width: '24px', height: '24px', cursor: 'pointer' }}
+                  />
+                  選択しない
+                </label>
+
+                {/* 3つの魚種ラジオボタン */}
                 {['カタクチイワシ', '伊勢エビ', 'ブリ'].map((fishName) => (
                   <label key={fishName} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                     <input 
-                      type="checkbox" 
-                      checked={editFish.includes(fishName)} // 配列の中に魚種が含まれていればチェックを入れる
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          // チェックされたら配列に追加
-                          setEditFish([...editFish, fishName]);
-                        } else {
-                          // チェックが外れたら配列から削除
-                          setEditFish(editFish.filter(f => f !== fishName));
-                        }
-                      }}
-                      style={{ width: '24px', height: '24px' }}
+                      type="radio" 
+                      name="targetFishSelection" // nameを統一することでグループ化し、1つしか選べなくする
+                      checked={editFish.includes(fishName)}
+                      onChange={() => setEditFish([fishName])} // 選んだ魚種1つだけの配列で上書きする
+                      style={{ width: '24px', height: '24px', cursor: 'pointer' }}
                     />
                     {fishName}
                   </label>
