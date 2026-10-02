@@ -544,12 +544,14 @@ export default function HeatmapPage() {
 
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-          const isFishMatch = selectedFishIds.includes(currentFishId);
-          if (!isFishMatch) return false;
-
+          return selectedFishIds.includes(currentFishId);
+          
+          // 【修正点1】
+          // 以下の日付フィルターを一旦コメントアウト（または削除）して、
+          // 取得できたデータを日付関係なく全て強制的に表示させます。
+          /*
           const timeString = p?.target_timestamp || p?.sample_timestamp || p?.record_timestamp;
           if (!timeString) return true;
-
           const safeTimeStr = timeString.replace(' ', 'T');
           const pDate = new Date(safeTimeStr);
           return (
@@ -557,6 +559,7 @@ export default function HeatmapPage() {
             pDate.getMonth() === targetMonth &&
             pDate.getDate() === targetDateNum
           );
+          */
         });
 
         // 1. その日のデータから最小値と最大値を取得してレンジを計算
@@ -573,14 +576,17 @@ export default function HeatmapPage() {
           const lat = Number(p?.latitude ?? p?.lat ?? 0);
           const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
-          // 2. 値を0〜100に正規化（自動スケーリング）
-          const normalizedWeight = fishValRange > 0 ? ((rawVal - minFishVal) / fishValRange) * 100 : 50;
+          // 最小値が0になって透明化してしまうのを防ぎます
+          const normalizedWeight = fishValRange > 0 
+            ? ((rawVal - minFishVal) / fishValRange) * 80 + 20 
+            : 50;
 
           return {
-            location: new google.maps.LatLng(lat, lng),
+            location: new window.google.maps.LatLng(lat, lng),
             weight: normalizedWeight,
           };
         });
+
 
         let fishGradient: string[];
         if (fishTheme === 'rainbow') {
