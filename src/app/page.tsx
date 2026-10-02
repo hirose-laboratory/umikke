@@ -56,12 +56,24 @@ interface OceanDataPoint {
 }
 
 interface FishPredictionPoint {
-  id: number;
-  fish_id: number;
+  id?: number;
+  fish_id?: number;
   latitude: number;
   longitude: number;
-  target_timestamp: string;
-  heatmap_value: number;
+  target_timestamp?: string;
+  heatmap_value?: number;
+  value?: number;
+  score?: number;
+}
+
+interface FishEdnaPinPoint {
+  id?: number;
+  fish_id?: number;
+  latitude: number;
+  longitude: number;
+  sample_date?: string;
+  value?: number | string;
+  dna_copies?: number;
 }
 
 interface Hotpoint {
@@ -94,6 +106,7 @@ export default function HeatmapPage() {
   const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
   const hotpointMarkersRef = useRef<GoogleMarkerInstance[]>([]);
+  const ednaMarkersRef = useRef<GoogleMarkerInstance[]>([]);
   const arrowMarkersRef = useRef<any[]>([]);
   const oceanPointsRef = useRef<OceanDataPoint[]>([]);
 
@@ -121,6 +134,9 @@ export default function HeatmapPage() {
   const [activeFishLayers, setActiveFishLayers] = useState<string[]>([]);
   const [marineTheme, setMarineTheme] = useState<string>('default');
   const [fishTheme, setFishTheme] = useState<string>('default');
+
+  // eDNA ピンデータ保持State
+  const [ednaPinPoints, setEdnaPinPoints] = useState<FishEdnaPinPoint[]>([]);
 
   // ユーザー認証・モーダル状態
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
@@ -531,6 +547,7 @@ export default function HeatmapPage() {
       }
     }
 
+    // 魚種ヒートマップ (edna-prediction データから描画)
     if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
@@ -540,11 +557,11 @@ export default function HeatmapPage() {
 
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
-          return selectedFishIds.includes(currentFishId);
+          return selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
         });
 
         const fishValues = targetFishPoints
-          .map((p: any) => Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 0))
+          .map((p: any) => Number(p?.heatmap_value ?? p?.value ?? p?.score ?? 0))
           .filter((v: number) => !isNaN(v) && v > 0);
 
         const minFishVal = fishValues.length > 0 ? Math.min(...fishValues) : 0;
@@ -552,7 +569,7 @@ export default function HeatmapPage() {
         const fishValRange = maxFishVal - minFishVal;
 
         const fishHeatData = targetFishPoints.map((p: any) => {
-          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.count ?? 0);
+          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.score ?? 0);
           const lat = Number(p?.latitude ?? p?.lat ?? 0);
           const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
@@ -594,7 +611,7 @@ export default function HeatmapPage() {
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
-  // 9. バックエンドAPI通信 (海況 / eDNA)
+  // 9. バックエンドAPI通信 (海況 / eDNA・予測)
   // ==========================================
   useEffect(() => {
     console.log("🟢 海上状況(Ocean)API取得のuseEffectが起動しました", { selectedFullDate, oceanRetryKey });
@@ -612,7 +629,6 @@ export default function HeatmapPage() {
         const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
         
         console.log(`🔵 APIにリクエストを送ります(海上状況): 期間=${start} ~ ${end}`);
-        console.log(`➡️ fetch実行: ${url}`);
 
         const res = await fetch(url);
         if (!res.ok) throw new Error(`データ取得に失敗しました (status: ${res.status})`);
@@ -624,7 +640,7 @@ export default function HeatmapPage() {
         setOceanPointCount(data.length);
         setOceanDataVersion((v) => v + 1);
 
-        console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`, data);
+        console.log(`✅ バックエンドから海上状況データ取得成功！: ${data.length}件のデータを取得しました`);
 
       } catch (err) {
         console.error('❌ 海上状況データの取得に失敗しました:', err);
@@ -645,6 +661,7 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, [oceanRetryKey, API_BASE_URL, selectedFullDate]);
   
+  // 魚種データ (ヒートマップ予測データとマップピンデータの2系統を取得)
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
 
@@ -652,6 +669,7 @@ export default function HeatmapPage() {
       if (activeFishLayers.length === 0) {
         console.log("🟡 魚種が選択されていないため、データ取得をスキップします");
         fishPointsRef.current = [];
+        setEdnaPinPoints([]);
         setOceanDataVersion((v) => v + 1);
         return;
       }
@@ -665,24 +683,43 @@ export default function HeatmapPage() {
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
       const targetDateStr = `${year}-${month}-${day}`;
 
-      console.log(`🔵 APIにリクエストを送ります: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
+      console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 日付=${targetDateStr}`);
 
       try {
-        const requests = fishIds.map((id) => {
-          const url = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
-          console.log(`➡️ fetch実行: ${url}`);
-          return fetch(url).then((res) => {
-            if (!res.ok) throw new Error(`Status ${res.status}`);
+        // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
+        const predictionRequests = fishIds.map((id) => {
+          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?date=${targetDateStr}`;
+          console.log(`➡️ 予測ヒートマップ fetch: ${predUrl}`);
+          return fetch(predUrl).then((res) => {
+            if (!res.ok) throw new Error(`Prediction Status ${res.status}`);
             return res.json();
           });
         });
 
-        const results = await Promise.all(requests);
-        fishPointsRef.current = results.flat();
-        console.log("✅ バックエンドからデータ取得成功！:", fishPointsRef.current);
+        // 2. マップピン観測データ (/fish/{id}/edna)
+        const pinRequests = fishIds.map((id) => {
+          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?date=${targetDateStr}`;
+          console.log(`➡️ 観測ピン fetch: ${pinUrl}`);
+          return fetch(pinUrl).then((res) => {
+            if (!res.ok) throw new Error(`Edna Pin Status ${res.status}`);
+            return res.json();
+          });
+        });
+
+        const [predictionResults, pinResults] = await Promise.all([
+          Promise.all(predictionRequests),
+          Promise.all(pinRequests),
+        ]);
+
+        fishPointsRef.current = predictionResults.flat();
+        setEdnaPinPoints(pinResults.flat());
+
+        console.log("✅ 魚種ヒートマップ予測データ取得完了:", fishPointsRef.current);
+        console.log("✅ 観測ピンデータ取得完了:", pinResults.flat());
+        
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
-        console.error('❌ eDNAデータの取得に失敗しました:', err);
+        console.error('❌ 魚種データの取得に失敗しました:', err);
       }
     }
 
@@ -792,6 +829,52 @@ export default function HeatmapPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // 観測ピン (eDNA) の描画エフェクト
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !window.google) return;
+    const map = mapInstanceRef.current;
+    const google = window.google;
+
+    ednaMarkersRef.current.forEach(m => m.setMap(null));
+    ednaMarkersRef.current = [];
+
+    ednaPinPoints.forEach(pin => {
+      const lat = Number(pin.latitude);
+      const lng = Number(pin.longitude);
+      if (!lat || !lng) return;
+
+      const marker = new google.maps.Marker({
+        position: { lat, lng },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#8e24aa',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 8
+        },
+        title: 'eDNA 観測地点'
+      });
+
+      marker.addListener('click', () => {
+        if (infoWindowRef.current) {
+          const valDisplay = pin.value ?? pin.dna_copies ?? '検出あり';
+          infoWindowRef.current.setContent(`
+            <div style="padding: 12px; color: #333; font-size: 16px;">
+              <strong style="font-size: 18px; color: #8e24aa;">📍 eDNA 観測ポイント</strong><br/>
+              <span style="font-size: 12px; color: #666;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</span><br/><br/>
+              数値: <b>${valDisplay}</b>
+            </div>
+          `);
+          infoWindowRef.current.open(map, marker);
+        }
+      });
+      ednaMarkersRef.current.push(marker);
+    });
+  }, [ednaPinPoints, mapReady]);
+
+  // サジェスト（Hotpoint）ピン描画
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -898,7 +981,7 @@ export default function HeatmapPage() {
         {/* 地図キャンバス */}
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
-        {/* ▽▽▽ 修正ポイント: pointer-events: none の影響を受けるコンテナ ▽▽▽ */}
+        {/* pointer-events: none の影響を受けるコンテナ */}
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
 
           {/* ヘッダーロゴ */}
@@ -994,7 +1077,7 @@ export default function HeatmapPage() {
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
         </div>
 
-        {/* ★★★ 修正ポイント: モーダル・メニュー類を ui-container(pointer-events:none) の【外側】へ移動しました ★★★ */}
+        {/* モーダル・メニュー類 */}
         
         {/* ログイン・新規登録モーダル */}
         {showLoginModal && (
