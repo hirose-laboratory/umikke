@@ -6,6 +6,7 @@
 interface TopRightMenuProps {
   isLoggedIn: boolean;
   loggedInEmail: string | null;
+  userName: string;
   setShowWindyMenu: (show: boolean) => void;
   setIsSignUp: (isSignUp: boolean) => void;
   setShowLoginModal: (show: boolean) => void;
@@ -17,6 +18,7 @@ interface TopRightMenuProps {
 export default function TopRightMenu({
   isLoggedIn,
   loggedInEmail,
+  userName,
   setShowWindyMenu,
   setIsSignUp,
   setShowLoginModal,
@@ -59,7 +61,7 @@ export default function TopRightMenu({
             account_circle
           </span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {loggedInEmail}
+            {userName}
           </span>
         </button>
       ) : (

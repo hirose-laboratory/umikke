@@ -298,7 +298,7 @@ export default function WindyMenu({
                 </label>
 
                 {/* 3つの魚種ラジオボタン */}
-                {['カタクチイワシ', '伊勢エビ', 'ブリ'].map((fishName) => (
+                {['カタクチイワシ', 'ブリ', '伊勢エビ'].map((fishName) => (
                   <label key={fishName} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontSize: '20px', cursor: 'pointer' }}>
                     <input 
                       type="radio" 

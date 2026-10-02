@@ -920,6 +920,7 @@ export default function HeatmapPage() {
           <TopRightMenu
             isLoggedIn={isLoggedIn} 
             loggedInEmail={loggedInEmail} 
+            userName={userName}
             setShowWindyMenu={setShowWindyMenu}
             setIsSignUp={setIsSignUp} 
             setShowLoginModal={setShowLoginModal}
