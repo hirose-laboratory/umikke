@@ -94,6 +94,52 @@ const getFishIdByName = (name: string): number => {
   return 1; // デフォルトID
 };
 
+// 2地点間の距離 (km) を計算する関数 (球面三角法 / Haversine式)
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // 地球の半径 (km)
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// 2km以内の近接ポイントを間引き、最もスコアが高い地点だけを残す関数 (NMS)
+function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoint[] {
+  // 1. スコアが高い順（降順）にソート
+  const sorted = [...points].sort((a, b) => {
+    const scoreA = Number(a.intensity_score ?? a.score ?? 0);
+    const scoreB = Number(b.intensity_score ?? b.score ?? 0);
+    return scoreB - scoreA;
+  });
+
+  const selected: Hotpoint[] = [];
+
+  // 2. 高スコア順に走査し、既に選ばれた地点と minDistanceKm 未満なら除外
+  for (const point of sorted) {
+    const isTooClose = selected.some((chosen) => {
+      const dist = getDistanceKm(
+        Number(point.latitude),
+        Number(point.longitude),
+        Number(chosen.latitude),
+        Number(chosen.longitude)
+      );
+      return dist < minDistanceKm;
+    });
+
+    if (!isTooClose) {
+      selected.push(point);
+    }
+  }
+
+  return selected;
+}
+
 export default function HeatmapPage() {
   // ==========================================
   // 3. Google Maps オブジェクト参照 (Ref)
@@ -738,10 +784,13 @@ if (fishHeatmapLayerRef.current) {
           };
         });
 
+        // ★ 2km以内の近接ポイントを間引く（2km圏内で最もスコアが高い地点のみ残す）
+        const filteredHotpoints = filterNearbyHotpoints(enrichedHotpoints, 2.0);
+
         // RefとStateにデータを反映
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
-        setHotpoints(enrichedHotpoints);
+        setHotpoints(filteredHotpoints);
 
         console.log("✅ 魚種ヒートマップ予測データ取得完了:", flatPred);
         console.log("✅ 観測ピンデータ取得完了:", flatPin);
