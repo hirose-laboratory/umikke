@@ -205,9 +205,11 @@ export default function HeatmapPage() {
   // 5. 凡例カラーバーのスタイル定義
   // ==========================================
   const legendGradientStyle = useMemo(() => {
-    if (marineTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
-    if (marineTheme === 'ocean') return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
-    return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (marineTheme === 'anomaly') return 'linear-gradient(to right, #2166AC, #67A9CF, #F7F7F7, #F4A582, #B2182B)';
+    if (marineTheme === 'ocean') return 'linear-gradient(to right, #F0F9FF, #BAE4F4, #6BAED6, #2171B5, #08306B)';
+    if (marineTheme === 'rainbow') return 'linear-gradient(to right, #3B4CC0, #00B4D8, #2ECC71, #FFD60A, #E63946)';
+    // デフォルト (viridis寄り)
+    return 'linear-gradient(to right, #0D0887, #3B4CC0, #2A9D8F, #8AC926, #FDE725)';
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
@@ -215,9 +217,10 @@ export default function HeatmapPage() {
   }, []);
 
   const fishLegendGradientStyle = useMemo(() => {
-    if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
-    if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
-    return 'linear-gradient(to right, rgba(142, 36, 170, 1), rgba(255, 152, 0, 1), rgba(255, 235, 59, 1))';
+    if (fishTheme === 'green') return 'linear-gradient(to right, #F7FCF5, #C7E9C0, #74C476, #238B45, #00441B)';
+    if (fishTheme === 'colorblind') return 'linear-gradient(to right, #00204D, #31446B, #666970, #958F78, #FFEA46)';
+    // デフォルト (viridis)
+    return 'linear-gradient(to right, #440154, #3B528B, #21918C, #5EC962, #FDE725)';
   }, [fishTheme]);
 
   // ==========================================
@@ -459,31 +462,15 @@ export default function HeatmapPage() {
         });
 
         let gradient = null;
-        if (marineTheme === 'rainbow') {
-          gradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+        if (marineTheme === 'anomaly') {
+          gradient = ['rgba(33, 102, 172, 0)', '#2166AC', '#67A9CF', '#F7F7F7', '#F4A582', '#B2182B'];
         } else if (marineTheme === 'ocean') {
-          gradient = ['rgba(0,105,148,0)', '#006994', '#00b4d8', '#90e0ef', '#caf0f8'];
+          gradient = ['rgba(240, 249, 255, 0)', '#F0F9FF', '#BAE4F4', '#6BAED6', '#2171B5', '#08306B'];
+        } else if (marineTheme === 'rainbow') {
+          gradient = ['rgba(59, 76, 192, 0)', '#3B4CC0', '#00B4D8', '#2ECC71', '#FFD60A', '#E63946'];
         } else {
-          if (hasSst && hasChl) {
-            gradient = ['rgba(255, 0, 255, 0)', 'rgba(128, 0, 128, 1)', 'rgba(255, 0, 255, 1)', 'rgba(255, 0, 0, 1)'];
-          } else if (hasChl) {
-            gradient = [
-              'rgba(123, 31, 162, 0)',
-              'rgba(123, 31, 162, 1)',
-              'rgba(233, 30, 99, 1)',
-              'rgba(255, 23, 68, 1)'
-            ];
-          } else {
-            gradient = [
-              'rgba(0, 0, 0, 0)',
-              'rgba(0, 0, 255, 1.0)',
-              'rgba(0, 255, 255, 1.0)',
-              'rgba(0, 255, 0, 1.0)',
-              'rgba(255, 255, 0, 1.0)',
-              'rgba(255, 165, 0, 1.0)',
-              'rgba(255, 0, 0, 1.0)'
-            ];
-          }
+          // デフォルト (viridis寄り)
+          gradient = ['rgba(13, 8, 135, 0)', '#0D0887', '#3B4CC0', '#2A9D8F', '#8AC926', '#FDE725'];
         }
 
         heatmapLayerRef.current.setData(heatPoints);
@@ -584,12 +571,13 @@ export default function HeatmapPage() {
         });
 
         let fishGradient: string[];
-        if (fishTheme === 'rainbow') {
-          fishGradient = ['rgba(0,0,255,0)', 'blue', 'cyan', 'lime', 'yellow', 'red'];
+        if (fishTheme === 'green') {
+          fishGradient = ['rgba(247, 252, 245, 0)', '#F7FCF5', '#C7E9C0', '#74C476', '#238B45', '#00441B'];
         } else if (fishTheme === 'colorblind') {
-          fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
+          fishGradient = ['rgba(0, 32, 77, 0)', '#00204D', '#31446B', '#666970', '#958F78', '#FFEA46'];
         } else {
-          fishGradient = ['rgba(142, 36, 170, 0)', 'rgba(142, 36, 170, 1)', 'rgba(255, 152, 0, 1)', 'rgba(255, 235, 59, 1)'];
+          // デフォルト (紫〜黄 / viridis)
+          fishGradient = ['rgba(68, 1, 84, 0)', '#440154', '#3B528B', '#21918C', '#5EC962', '#FDE725'];
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
@@ -656,7 +644,7 @@ export default function HeatmapPage() {
 
     fetchOceanData();
   }, [API_BASE_URL, selectedFullDate, oceanRetryKey]);
-  
+
 
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
