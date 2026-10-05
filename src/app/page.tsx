@@ -205,11 +205,9 @@ export default function HeatmapPage() {
   // 5. 凡例カラーバーのスタイル定義
   // ==========================================
   const legendGradientStyle = useMemo(() => {
-    if (marineTheme === 'anomaly') return 'linear-gradient(to right, #2166AC, #67A9CF, #F7F7F7, #F4A582, #B2182B)';
-    if (marineTheme === 'ocean') return 'linear-gradient(to right, #F0F9FF, #BAE4F4, #6BAED6, #2171B5, #08306B)';
-    if (marineTheme === 'rainbow') return 'linear-gradient(to right, #3B4CC0, #00B4D8, #2ECC71, #FFD60A, #E63946)';
-    // デフォルト (viridis寄り)
-    return 'linear-gradient(to right, #0D0887, #3B4CC0, #2A9D8F, #8AC926, #FDE725)';
+    if (marineTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (marineTheme === 'ocean') return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
+    return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
@@ -217,10 +215,9 @@ export default function HeatmapPage() {
   }, []);
 
   const fishLegendGradientStyle = useMemo(() => {
-    if (fishTheme === 'green') return 'linear-gradient(to right, #F7FCF5, #C7E9C0, #74C476, #238B45, #00441B)';
-    if (fishTheme === 'colorblind') return 'linear-gradient(to right, #00204D, #31446B, #666970, #958F78, #FFEA46)';
-    // デフォルト (viridis)
-    return 'linear-gradient(to right, #440154, #3B528B, #21918C, #5EC962, #FDE725)';
+    if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (fishTheme === 'colorblind') return 'linear-gradient(to right, #E69F00, #56B4E9, #009E73, #F0E442)';
+    return 'linear-gradient(to right, rgba(142, 36, 170, 1), rgba(255, 152, 0, 1), rgba(255, 235, 59, 1))';
   }, [fishTheme]);
 
   // ==========================================
@@ -659,7 +656,7 @@ export default function HeatmapPage() {
 
     fetchOceanData();
   }, [API_BASE_URL, selectedFullDate, oceanRetryKey]);
-
+  
 
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
