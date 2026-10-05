@@ -547,41 +547,35 @@ export default function HeatmapPage() {
       }
     }
 
-    // 魚種ヒートマップ (edna-prediction データから描画)
-    if (fishHeatmapLayerRef.current) {
+if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         const selectedFishIds: number[] = Array.from(
           new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
         );
 
+        // 1. 対象の魚種でフィルタ
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           return selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
         });
 
-        const fishValues = targetFishPoints
-          .map((p: any) => Number(p?.heatmap_value ?? p?.value ?? p?.score ?? 0))
-          .filter((v: number) => !isNaN(v) && v > 0);
+        // 2. 閾値（例: 0.05以上）でフィルタリングして、0（魚がいない地点）を除外する
+        // ※SQLの分布を見ると0.1以上は数十件しかないので、0.01〜0.05程度から拾うと綺麗にグラデーションが出ます
+        const THRESHOLD = 0.02; 
 
-        const minFishVal = fishValues.length > 0 ? Math.min(...fishValues) : 0;
-        const maxFishVal = fishValues.length > 0 ? Math.max(...fishValues) : 1;
-        const fishValRange = maxFishVal - minFishVal;
+        const fishHeatData = targetFishPoints
+          .map((p: any) => {
+            const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.score ?? 0);
+            const lat = Number(p?.latitude ?? p?.lat ?? 0);
+            const lng = Number(p?.longitude ?? p?.lng ?? 0);
 
-        const fishHeatData = targetFishPoints.map((p: any) => {
-          const rawVal = Number(p?.heatmap_value ?? p?.value ?? p?.score ?? 0);
-          const lat = Number(p?.latitude ?? p?.lat ?? 0);
-          const lng = Number(p?.longitude ?? p?.lng ?? 0);
-
-          const normalizedWeight = fishValRange > 0 
-            ? ((rawVal - minFishVal) / fishValRange) * 80 + 20 
-            : 50;
-
-          return {
-            location: new window.google.maps.LatLng(lat, lng),
-            weight: normalizedWeight,
-          };
-        });
+            return {
+              location: new window.google.maps.LatLng(lat, lng),
+              weight: rawVal, // 0.0〜1.0 の値をそのまま weight に使用
+            };
+          })
+          .filter((item) => item.weight >= THRESHOLD); // 閾値未満をカット！
 
         let fishGradient: string[];
         if (fishTheme === 'rainbow') {
@@ -589,15 +583,21 @@ export default function HeatmapPage() {
         } else if (fishTheme === 'colorblind') {
           fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
         } else {
-          fishGradient = ['rgba(142, 36, 170, 0)', 'rgba(142, 36, 170, 1)', 'rgba(255, 152, 0, 1)', 'rgba(255, 235, 59, 1)'];
+          // 低濃度（紫）〜 中濃度（オレンジ）〜 高濃度（黄色）
+          fishGradient = [
+            'rgba(142, 36, 170, 0)',   // ゼロ付近は透明
+            'rgba(142, 36, 170, 0.8)', // 紫
+            'rgba(255, 152, 0, 0.9)',  // オレンジ
+            'rgba(255, 235, 59, 1.0)'  // 黄色
+          ];
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 50,          
-          maxIntensity: 25,    
-          opacity: 0.9,        
+          radius: 30,          // メッシュの密度に合わせて 20〜40 程度に調整
+          maxIntensity: 1.0,   // weightが0〜1なので、最大強度を 1.0 に設定
+          opacity: 0.85,
         });
       } else {
         fishHeatmapLayerRef.current.setData([]);
