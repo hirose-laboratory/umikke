@@ -611,7 +611,7 @@ export default function HeatmapPage() {
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
   // ==========================================
-  // 9. バックエンドAPI通信 (海況 / eDNA・予測 / Hotpoints)
+  // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
   // ==========================================
   useEffect(() => {
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
@@ -621,51 +621,50 @@ export default function HeatmapPage() {
         console.log("🟡 魚種が選択されていないため、データ取得をスキップします");
         fishPointsRef.current = [];
         setEdnaPinPoints([]);
-        setHotpoints([]); // サジェストピンもクリア
+        setHotpoints([]); 
         setOceanDataVersion((v) => v + 1);
         return;
       }
 
+      // 選択された魚種名からIDリストを生成
       const fishIds: number[] = Array.from(
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
+      // バックエンドの datetime 型に合わせて ISOフォーマット (YYYY-MM-DDTHH:mm:ss) を作成
       const year = selectedFullDate.getFullYear();
       const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
       const targetDateStr = `${year}-${month}-${day}`;
-
-      // バックエンドの datetime パラメータに合わせて ISO 形式の開始・終了日時を作成
       const start = `${targetDateStr}T00:00:00`;
       const end = `${targetDateStr}T23:59:59`;
 
       console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 期間=${start} ~ ${end}`);
 
       try {
-        // 1. ヒートマップ予測データ (/fish/{id}/edna-prediction)
+        // 1. ヒートマップ用 eDNA予測データ取得
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 2. マップピン観測データ (/fish/{id}/edna)
+        // 2. ピン表示用 eDNA実測データ取得
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 3. ホットポイント（漁場候補地）データ (/fish/hotpoints/high-score)
-        // ※ ルーター定義に基づき fish_id は付与せず、期間とスコアで取得します
+        // 3. ホットポイント（漁場候補地）データ取得
         const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
         const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
 
-        // 4. サジェスト提案テキストデータ (/fish/{id}/suggestions)
+        // 4. サジェスト（提案テキスト）データ取得
         const suggestionRequests = fishIds.map((id) => {
           const suggestUrl = `${API_BASE_URL}/fish/${id}/suggestions`;
           return fetch(suggestUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 並列で全てのリクエストを処理
+        // 全てのリクエストを並列処理で待機
         const [predictionResults, pinResults, rawHotpoints, suggestionResults] = await Promise.all([
           Promise.all(predictionRequests),
           Promise.all(pinRequests),
@@ -673,13 +672,13 @@ export default function HeatmapPage() {
           Promise.all(suggestionRequests),
         ]);
 
+        // 2次元配列をフラット化
         const flatPred = predictionResults.flat();
         const flatPin = pinResults.flat();
         const flatSuggestions = suggestionResults.flat();
 
-        // 取得したサジェスト提案テキストを Hotpoints と結合する（必要に応じて）
+        // 取得したサジェスト提案を Hotpoints の各データにマージ
         const enrichedHotpoints = rawHotpoints.map((hp: any) => {
-          // Hotpoint に対応する fish_id があれば、その提案を結合する
           const suggestionObj = hp.fish_id 
             ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
             : null;
@@ -689,15 +688,15 @@ export default function HeatmapPage() {
           };
         });
 
-        // Ref と State にデータを格納
+        // RefとStateにデータを反映
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
         setHotpoints(enrichedHotpoints);
 
         console.log("✅ 魚種ヒートマップ予測データ取得完了:", flatPred);
         console.log("✅ 観測ピンデータ取得完了:", flatPin);
-        console.log("✅ サジェストHotpoints取得完了:", enrichedHotpoints);
         
+        // 地図レイヤーの再描画トリガーを発火
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('❌ 魚種データの予期せぬエラー:', err);
