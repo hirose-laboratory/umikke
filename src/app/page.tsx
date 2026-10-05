@@ -959,8 +959,8 @@ if (fishHeatmapLayerRef.current) {
       ednaMarkersRef.current.push(marker);
     });
   }, [ednaPinPoints, mapReady]);
-
-  // サジェスト（Hotpoint）ピン描画
+ 
+ // サジェスト（Hotpoint）ピン描画
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -973,26 +973,21 @@ if (fishHeatmapLayerRef.current) {
       const marker = new google.maps.Marker({
         position: { lat: hp.latitude, lng: hp.longitude },
         map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#e65100',
-          fillOpacity: 0.8,
-          strokeColor: 'white',
-          strokeWeight: 2,
-          scale: 9
-        },
-        title: '漁場サジェスト'
+        // ★ iconプロパティを削除（または未指定）にすると、Google Maps標準の赤いピンになります
+        title: '予測ポイント詳細'
       });
 
       marker.addListener('click', () => {
         if (infoWindowRef.current) {
           const displayScore = hp.intensity_score || hp.score || 'N/A';
+          const scoreText = typeof displayScore === 'number' ? displayScore.toFixed(2) : displayScore;
+
           infoWindowRef.current.setContent(`
-            <div style="padding: 12px; color: #333; font-size: 16px;">
-              <strong style="font-size: 18px; color: #e65100;">漁場サジェストポイント (環境予測ベース)</strong><br/>
-              <span style="font-size: 14px; color: #666;">※水温と潮目の環境データから算出</span><br/><br/>
-              スコア: <b>${typeof displayScore === 'number' ? displayScore.toFixed(2) : displayScore}</b><br/>
-              ${hp.suggestion ? `提案: ${hp.suggestion}` : ''}
+            <div style="padding: 8px 12px; color: #333; font-family: sans-serif; line-height: 1.4;">
+              <div style="font-size: 18px; color: #00447c; margin-bottom: 4px;">予測ポイント詳細</div>
+              <div style="font-size: 16px; color: #555;">スコア: ${scoreText}</div>
+              <div style="font-size: 16px; color: #555;">取得時間: 12:00</div>
+              <div style="font-size: 14px; color: #666; margin-top: 2px;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
