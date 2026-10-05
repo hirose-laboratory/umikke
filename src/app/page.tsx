@@ -583,20 +583,23 @@ if (fishHeatmapLayerRef.current) {
         } else if (fishTheme === 'colorblind') {
           fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
         } else {
-          // 低濃度（紫）〜 中濃度（オレンジ）〜 高濃度（黄色）
+          // 紫 〜 赤紫 〜 橙 〜 黄色 を多段階にして滑らかにする
           fishGradient = [
-            'rgba(142, 36, 170, 0)',   // ゼロ付近は透明
-            'rgba(142, 36, 170, 0.8)', // 紫
-            'rgba(255, 152, 0, 0.9)',  // オレンジ
-            'rgba(255, 235, 59, 1.0)'  // 黄色
+            'rgba(142, 36, 170, 0)',     // 外枠（透明）
+            'rgba(142, 36, 170, 0.6)',   // 深い紫（低濃度）
+            'rgba(186, 104, 200, 0.8)',  // 明るい紫
+            'rgba(239, 108, 0, 0.85)',   // 赤みのあるオレンジ
+            'rgba(255, 152, 0, 0.9)',    // オレンジ（中濃度）
+            'rgba(255, 193, 7, 0.95)',   // 山吹色
+            'rgba(255, 235, 59, 1.0)'    // 鮮やかな黄色（最高濃度・コア）
           ];
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 30,          // メッシュの密度に合わせて 20〜40 程度に調整
-          maxIntensity: 1.0,   // weightが0〜1なので、最大強度を 1.0 に設定
+          radius: 40,          // 30 → 40 に広げて点のつなぎ目を滑らかに
+          maxIntensity: 3.0,   // ★ 1.0 → 2.5〜3.5 に引き上げ（飽和を防ぐ）
           opacity: 0.85,
         });
       } else {
