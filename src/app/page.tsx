@@ -217,6 +217,7 @@ export default function HeatmapPage() {
   }, []);
 
   const fishLegendGradientStyle = useMemo(() => {
+    if (fishTheme === 'rainbow') return 'linear-gradient(to right, #3B4CC0, #00B4D8, #2ECC71, #FFD60A, #E63946)';
     if (fishTheme === 'green') return 'linear-gradient(to right, #F7FCF5, #C7E9C0, #74C476, #238B45, #00441B)';
     if (fishTheme === 'colorblind') return 'linear-gradient(to right, #00204D, #31446B, #666970, #958F78, #FFEA46)';
     // デフォルト (viridis)
@@ -571,7 +572,9 @@ export default function HeatmapPage() {
         });
 
         let fishGradient: string[];
-        if (fishTheme === 'green') {
+        if (fishTheme === 'rainbow') {
+          fishGradient = ['rgba(59, 76, 192, 0)', '#3B4CC0', '#00B4D8', '#2ECC71', '#FFD60A', '#E63946'];
+        } else if (fishTheme === 'green') {
           fishGradient = ['rgba(247, 252, 245, 0)', '#F7FCF5', '#C7E9C0', '#74C476', '#238B45', '#00441B'];
         } else if (fishTheme === 'colorblind') {
           fishGradient = ['rgba(0, 32, 77, 0)', '#00204D', '#31446B', '#666970', '#958F78', '#FFEA46'];
