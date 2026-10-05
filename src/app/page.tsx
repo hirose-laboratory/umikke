@@ -656,7 +656,6 @@ export default function HeatmapPage() {
 
     fetchOceanData();
   }, [API_BASE_URL, selectedFullDate, oceanRetryKey]);
-  
 
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
