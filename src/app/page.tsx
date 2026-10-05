@@ -644,7 +644,8 @@ export default function HeatmapPage() {
       try {
         // 1. ヒートマップ用 eDNA予測データ取得
         const predictionRequests = fishIds.map((id) => {
-          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+          // ★ start と end のパラメータを一時的に外して全データを取得するようにします
+          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
