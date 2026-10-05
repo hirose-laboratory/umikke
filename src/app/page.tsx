@@ -610,6 +610,54 @@ export default function HeatmapPage() {
     updateMapLayers();
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
+
+  // ==========================================
+  // 8.5. バックエンドAPI通信 (海況データ取得)
+  // ==========================================
+  useEffect(() => {
+    console.log("🟢 海況API取得のuseEffectが起動しました", { selectedFullDate });
+
+    async function fetchOceanData() {
+      setOceanLoading(true);
+      setOceanError(null);
+
+      // 選択された日付から開始・終了日時を作成
+      const year = selectedFullDate.getFullYear();
+      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedFullDate.getDate()).padStart(2, '0');
+      const targetDateStr = `${year}-${month}-${day}`;
+      const start = `${targetDateStr}T00:00:00`;
+      const end = `${targetDateStr}T23:59:59`;
+
+      const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+      
+      console.log(`🔵 海況データAPI取得: 期間=${start} ~ ${end}`);
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        
+        oceanPointsRef.current = data;
+        setOceanPointCount(data.length);
+
+        console.log("✅ 海況データ取得完了:", data);
+        
+        setOceanDataVersion((v) => v + 1);
+      } catch (err: any) {
+        console.error('❌ 海況データの予期せぬエラー:', err);
+        setOceanError(err.message);
+      } finally {
+        setOceanLoading(false);
+      }
+    }
+
+    fetchOceanData();
+  }, [API_BASE_URL, selectedFullDate, oceanRetryKey]);
+  
+
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
   // ==========================================
@@ -644,8 +692,7 @@ export default function HeatmapPage() {
       try {
         // 1. ヒートマップ用 eDNA予測データ取得
         const predictionRequests = fishIds.map((id) => {
-          // ★ start と end のパラメータを一時的に外して全データを取得するようにします
-          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction`;
+          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
