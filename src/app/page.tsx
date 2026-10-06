@@ -91,12 +91,12 @@ const getFishIdByName = (name: string): number => {
   if (name.includes('伊勢エビ') || name.includes('エビ')) return 2;
   if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
   if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
-  return 1; // デフォルトID
+  return 1;
 };
 
-// 2地点間の距離 (km) を計算する関数 (球面三角法 / Haversine式)
+// 2地点間の距離 (km) を計算する関数
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // 地球の半径 (km)
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -109,7 +109,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
-// 2km以内の近接ポイントを間引き、最もスコアが高い地点だけを残す関数 (NMS)
+// 2km以内の近接ポイントを間引き
 function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoint[] {
   const sorted = [...points].sort((a, b) => {
     const scoreA = Number(a.intensity_score ?? a.score ?? 0);
@@ -415,6 +415,8 @@ export default function HeatmapPage() {
 
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedAuth));
 
+    // バックエンド側でAPIが実装された段階でコメントアウトを解除して使用してください
+    /*
     if (auth.token) {
       try {
         await fetch(`${API_BASE_URL}/users/profile`, {
@@ -429,18 +431,18 @@ export default function HeatmapPage() {
         console.warn('バックエンド同期スキップ (ローカル保存完了)', e);
       }
     }
+    */
 
     alert('プロフィールを保存しました！');
   };
 
-  // ★初回読み込み・リロード時の復元処理
+  // 初回読み込み・リロード時の復元処理
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (stored) {
       try {
         const auth = JSON.parse(stored);
         
-        // 1. 保存された名前・魚種情報を優先復元
         if (auth.name) setUserName(auth.name);
         
         let fishToSet = '';
@@ -453,7 +455,6 @@ export default function HeatmapPage() {
           setTargetFish(fishToSet);
         }
 
-        // 2. 有効なトークンがあればログイン状態にし、レイヤーに反映
         if (auth?.token) { 
           setIsLoggedIn(true); 
           if (auth.email) setLoggedInEmail(auth.email); 
@@ -849,7 +850,7 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=3.64`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=weekly&loading=async`;
       newScript.async = true; 
       newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
