@@ -593,7 +593,7 @@ export default function HeatmapPage() {
       }
     }
 
-if (fishHeatmapLayerRef.current) {
+    if (fishHeatmapLayerRef.current) {
       if (activeFishLayers.length > 0) {
         const allFishPoints = fishPointsRef.current;
         const selectedFishIds: number[] = Array.from(
@@ -607,7 +607,6 @@ if (fishHeatmapLayerRef.current) {
         });
 
         // 2. 閾値（例: 0.05以上）でフィルタリングして、0（魚がいない地点）を除外する
-        // ※SQLの分布を見ると0.1以上は数十件しかないので、0.01〜0.05程度から拾うと綺麗にグラデーションが出ます
         const THRESHOLD = 0.02; 
 
         const fishHeatData = targetFishPoints
@@ -645,7 +644,7 @@ if (fishHeatmapLayerRef.current) {
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
           radius: 40,          // 30 → 40 に広げて点のつなぎ目を滑らかに
-          maxIntensity: 3.0,   // ★ 1.0 → 2.5〜3.5 に引き上げ（飽和を防ぐ）
+          maxIntensity: 3.0,   //  1.0 → 2.5〜3.5 に引き上げ（飽和を防ぐ）
           opacity: 0.85,
         });
       } else {
