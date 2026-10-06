@@ -913,11 +913,11 @@ export default function HeatmapPage() {
           const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           
           infoWindowRef.current?.setContent(`
-            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+            <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
               <div style="font-size: 24px; font-weight: bold; color: #0044cc; margin-bottom: 8px;">観測ポイント詳細</div>
-              <div style="font-size: 20px; color: #333;">水温: <b style="font-size: 22px;">${nearestPoint.sst?.toFixed(1)} ℃</b></div>
-              <div style="font-size: 20px; color: #333;">取得時間: ${timeStr}</div>
-              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</div>
+              <div style="font-size: 20px; color: #222; font-weight: bold;">水温: <span style="font-size: 22px;">${nearestPoint.sst?.toFixed(1)} ℃</span></div>
+              <div style="font-size: 20px; color: #222; font-weight: bold;">取得時間: <span style="font-size: 22px;">${timeStr}</span></div>
+              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
@@ -956,10 +956,10 @@ export default function HeatmapPage() {
         if (infoWindowRef.current) {
           const valDisplay = pin.value ?? pin.dna_copies ?? '検出あり';
           infoWindowRef.current.setContent(`
-            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+            <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
               <div style="font-size: 24px; font-weight: bold; color: #8e24aa; margin-bottom: 8px;">📍 eDNA 観測</div>
-              <div style="font-size: 20px; color: #333; margin-bottom: 4px;">数値: <b style="font-size: 22px;">${valDisplay}</b></div>
-              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</div>
+              <div style="font-size: 20px; color: #222; font-weight: bold;">数値: <span style="font-size: 22px;">${valDisplay}</span></div>
+              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
@@ -989,11 +989,11 @@ export default function HeatmapPage() {
           const scoreText = typeof displayScore === 'number' ? displayScore.toFixed(2) : displayScore;
 
           infoWindowRef.current.setContent(`
-            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+            <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
               <div style="font-size: 24px; font-weight: bold; color: #00447c; margin-bottom: 8px;">予測ポイント詳細</div>
-              <div style="font-size: 20px; color: #333; font-weight: bold;">スコア: <span style="font-size: 22px;">${scoreText}</span></div>
-              <div style="font-size: 20px; color: #333;">取得時間: 12:00</div>
-              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
+              <div style="font-size: 20px; color: #222; font-weight: bold;">スコア: <span style="font-size: 22px;">${scoreText}</span></div>
+              <div style="font-size: 20px; color: #222; font-weight: bold;">取得時間: <span style="font-size: 22px;">12:00</span></div>
+              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
