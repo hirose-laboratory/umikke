@@ -13,6 +13,8 @@ interface RightSidebarProps {
   activeFishLayers: string[];
   setActiveFishLayers: (layers: string[]) => void;
   isLoggedIn?: boolean;
+  // ▼ 追加: ログインモーダルを開くための関数を受け取る
+  setShowLoginModal: (show: boolean) => void;
 }
 
 // ==========================================
@@ -28,6 +30,7 @@ export default function RightSidebar({
   activeFishLayers,
   setActiveFishLayers,
   isLoggedIn = false,
+  setShowLoginModal, // ▼ 追加
 }: RightSidebarProps) {
 
   // 海況レイヤーの表示切り替え
@@ -82,14 +85,27 @@ export default function RightSidebar({
       {/* 2. 魚種分布パネル (マダイ / ブリ / 伊勢エビ) */}
       <div className="layer-container" style={{ position: 'relative', background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        {/* 未ログイン時ブロックオーバーレイ（一時無効化） */}
-        {/* {!isLoggedIn && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        {/* ▼▼▼ 未ログイン時ブロックオーバーレイ（有効化＆クリック処理追加） ▼▼▼ */}
+        {!isLoggedIn && (
+          <div 
+            onClick={() => setShowLoginModal(true)} // クリックでログイン画面へ
+            style={{ 
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+              backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', 
+              zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+              padding: '20px', cursor: 'pointer' 
+            }}
+          >
             <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '16px 28px', borderRadius: '40px', fontSize: '26px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span>🔒 ログインして機能を開放</span>
             </div>
+            {/* 前にいただいた要望のテキストも補足として追加しています */}
+            <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginTop: '16px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+              ログインすると分布や予測が見れます
+            </span>
           </div>
-        )} */}
+        )}
+        {/* ▲▲▲ 修正ここまで ▲▲▲ */}
 
         <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>

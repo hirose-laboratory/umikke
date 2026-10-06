@@ -221,23 +221,22 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  // 依存配列に isLoggedIn を追加します
-const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
-  if (!isLoggedIn) {
-    alert('魚種分布データ（ヒートマップ・予測ポイント）を見るにはログインが必要です。');
-    setShowLoginModal(true);
-    return;
-  }
-
-  setActiveFishLayers((prev) => {
-    const next = typeof val === 'function' ? val(prev) : val;
-    const added = next.filter((item) => !prev.includes(item));
-    if (added.length > 0) {
-      return [added[added.length - 1]];
+  // 魚種分布のレイヤー切り替え（未ログイン時は制限）
+  const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
     }
-    return next;
-  });
-}, [isLoggedIn]);
+
+    setActiveFishLayers((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      const added = next.filter((item) => !prev.includes(item));
+      if (added.length > 0) {
+        return [added[added.length - 1]];
+      }
+      return next;
+    });
+  }, [isLoggedIn]);
 
   // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
@@ -340,6 +339,7 @@ const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) =>
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setIsLoggedIn(false); setLoggedInEmail(null); setShowWindyMenu(false);
+    setActiveFishLayers([]); // ログアウト時に魚種レイヤーもクリア
   };
 
   const handleDeleteAccount = async () => {
@@ -719,14 +719,15 @@ const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) =>
     console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
 
     async function fetchFishData() {
-    if (!isLoggedIn || activeFishLayers.length === 0) {
-      console.log("🟡 未ログインまたは魚種未選択のため、魚種データをクリアします");
-      fishPointsRef.current = [];
-      setEdnaPinPoints([]);
-      setHotpoints([]); 
-      setOceanDataVersion((v) => v + 1);
-      return;
-    }
+      // 未ログイン、または魚種が選択されていない場合はデータを空にしてスキップ
+      if (!isLoggedIn || activeFishLayers.length === 0) {
+        console.log("🟡 未ログインまたは魚種未選択のため、魚種データをクリアします");
+        fishPointsRef.current = [];
+        setEdnaPinPoints([]);
+        setHotpoints([]); 
+        setOceanDataVersion((v) => v + 1);
+        return;
+      }
 
       // 選択された魚種名からIDリストを生成
       const fishIds: number[] = Array.from(
@@ -809,7 +810,7 @@ const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) =>
     }
 
     fetchFishData();
-  }, [API_BASE_URL, activeFishLayers, selectedFullDate]);
+  }, [API_BASE_URL, activeFishLayers, selectedFullDate, isLoggedIn]); // ★ isLoggedIn を依存配列に追加
 
 
   // ==========================================
@@ -1098,38 +1099,18 @@ const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) =>
 
           {/* 右側レイヤー選択サイドバー */}
 <RightSidebar
-  showMarinePanel={showMarinePanel} setShowMarinePanel={setShowMarinePanel}
-  showFishPanel={showFishPanel} setShowFishPanel={setShowFishPanel}
-  activeMarineLayers={activeMarineLayers} setActiveMarineLayers={handleMarineLayersUpdate}
-  activeFishLayers={activeFishLayers} setActiveFishLayers={handleFishLayersUpdate}
+  showMarinePanel={showMarinePanel} 
+  setShowMarinePanel={setShowMarinePanel}
+  showFishPanel={showFishPanel} 
+  setShowFishPanel={setShowFishPanel}
+  activeMarineLayers={activeMarineLayers} 
+  setActiveMarineLayers={handleMarineLayersUpdate} // または setActiveMarineLayers
+  activeFishLayers={activeFishLayers} 
+  setActiveFishLayers={handleFishLayersUpdate}     // または setActiveFishLayers
+  
+  isLoggedIn={isLoggedIn}                 // ← これと
+  setShowLoginModal={setShowLoginModal}   // ← これを渡す
 />
-
-{!isLoggedIn && (
-  <div style={{
-    position: 'absolute', top: '100px', right: '100px', // ※RightSidebarの横幅に合わせてrightの数値を調整してください
-    background: 'rgba(0, 30, 60, 0.85)', color: 'white',
-    padding: '16px 20px', borderRadius: '12px', fontSize: '16px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.4)', pointerEvents: 'auto',
-    zIndex: 15, display: 'flex', flexDirection: 'column', gap: '12px',
-    border: '1px solid #005f73'
-  }}>
-    <div style={{ fontWeight: 'bold', fontSize: '18px' }}>🐟 魚種分布・予測マップ</div>
-    <div style={{ fontSize: '14px', color: '#ccc', lineHeight: '1.4' }}>
-      ログインすると、対象魚種の<br/>ヒートマップや予測ポイントが見れます。
-    </div>
-    <button 
-      onClick={() => setShowLoginModal(true)}
-      style={{
-        background: '#ff9800', color: '#fff', border: 'none', 
-        borderRadius: '8px', padding: '10px', fontSize: '16px', 
-        fontWeight: 'bold', cursor: 'pointer', marginTop: '4px'
-      }}
-    >
-      ログイン / 新規登録
-    </button>
-  </div>
-)}
-
 
           {/* 左下動的凡例 */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
