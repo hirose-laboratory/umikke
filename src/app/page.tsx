@@ -111,7 +111,6 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
 
 // 2km以内の近接ポイントを間引き、最もスコアが高い地点だけを残す関数 (NMS)
 function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoint[] {
-  // 1. スコアが高い順（降順）にソート
   const sorted = [...points].sort((a, b) => {
     const scoreA = Number(a.intensity_score ?? a.score ?? 0);
     const scoreB = Number(b.intensity_score ?? b.score ?? 0);
@@ -120,7 +119,6 @@ function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoin
 
   const selected: Hotpoint[] = [];
 
-  // 2. 高スコア順に走査し、既に選ばれた地点と minDistanceKm 未満なら除外
   for (const point of sorted) {
     const isTooClose = selected.some((chosen) => {
       const dist = getDistanceKm(
@@ -164,7 +162,6 @@ export default function HeatmapPage() {
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   }, []);
 
-  // UI・タイムライン状態
   const [baseDate, setBaseDate] = useState<Date>(initDate);
   const [currentProgress, setCurrentProgress] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -173,7 +170,6 @@ export default function HeatmapPage() {
   const [calMonth, setCalMonth] = useState<number>(initDate.getMonth());
   const [isMounted, setIsMounted] = useState(false);
 
-  // レイヤー・テーマ選択状態
   const [showMarinePanel, setShowMarinePanel] = useState<boolean>(true);
   const [showFishPanel, setShowFishPanel] = useState<boolean>(true);
   const [activeMarineLayers, setActiveMarineLayers] = useState<string[]>(['sst', 'current']);
@@ -181,10 +177,8 @@ export default function HeatmapPage() {
   const [marineTheme, setMarineTheme] = useState<string>('default');
   const [fishTheme, setFishTheme] = useState<string>('default');
 
-  // eDNA ピンデータ保持State
   const [ednaPinPoints, setEdnaPinPoints] = useState<FishEdnaPinPoint[]>([]);
 
-  // ユーザー認証・モーダル状態
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showWindyMenu, setShowWindyMenu] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
@@ -195,7 +189,6 @@ export default function HeatmapPage() {
   const [userName, setUserName] = useState<string>('名無しアングラー');
   const [targetFish, setTargetFish] = useState<string>(''); 
 
-  // データ取得・マップ読み込み状態
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
   const [oceanError, setOceanError] = useState<string | null>(null);
   const [oceanDataVersion, setOceanDataVersion] = useState<number>(0);
@@ -209,7 +202,6 @@ export default function HeatmapPage() {
     setIsMounted(true);
   }, []);
 
-  // 水温とクロロフィルを切り替え式にするフィルター
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveMarineLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
@@ -221,13 +213,11 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  // 魚種分布のレイヤー切り替え（未ログイン時は制限）
   const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     if (!isLoggedIn) {
       setShowLoginModal(true);
       return;
     }
-
     setActiveFishLayers((prev) => {
       const next = typeof val === 'function' ? val(prev) : val;
       const added = next.filter((item) => !prev.includes(item));
@@ -238,7 +228,6 @@ export default function HeatmapPage() {
     });
   }, [isLoggedIn]);
 
-  // 選択中の日付保持
   const selectedFullDate = useMemo(() => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + currentProgress);
@@ -253,9 +242,6 @@ export default function HeatmapPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://27.133.132.208:8000';
   const AUTH_STORAGE_KEY = 'umikke_auth';
 
-  // ==========================================
-  // 5. 凡例カラーバーのスタイル定義
-  // ==========================================
   const legendGradientStyle = useMemo(() => {
     if (marineTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
     if (marineTheme === 'ocean') return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
@@ -290,13 +276,34 @@ export default function HeatmapPage() {
       const data = await res.json();
       const token = data.token ?? data.access_token ?? '';
       const loggedEmail = data.email ?? email;
+      
+      // ★バックエンドからのデータとローカルデータを統合
       const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
+      const fetchedName = data.name ?? existingAuth.name ?? '名無しアングラー';
+      const fetchedTargetFish = data.targetFish ?? existingAuth.targetFish ?? '';
+
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
         ...existingAuth,
         token, 
-        email: loggedEmail 
+        email: loggedEmail,
+        name: fetchedName,
+        targetFish: fetchedTargetFish
       }));
-      setIsLoggedIn(true); setLoggedInEmail(loggedEmail); setShowLoginModal(false); setShowWindyMenu(true); setPassword('');
+      
+      // ★ログイン成功と同時にStateとレイヤーに反映
+      setIsLoggedIn(true); 
+      setLoggedInEmail(loggedEmail); 
+      setUserName(fetchedName);
+      setTargetFish(fetchedTargetFish);
+      if (fetchedTargetFish) {
+        setActiveFishLayers([fetchedTargetFish]);
+      } else {
+        setActiveFishLayers([]);
+      }
+      
+      setShowLoginModal(false); 
+      setShowWindyMenu(true); 
+      setPassword('');
     } catch (err) {
       console.error(err); alert('ログイン処理中にエラーが発生しました。');
     }
@@ -320,13 +327,27 @@ export default function HeatmapPage() {
       const registeredEmail = data.email ?? email;
       if (token) {
         const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
+        const fetchedName = data.name ?? existingAuth.name ?? '名無しアングラー';
+        const fetchedTargetFish = data.targetFish ?? existingAuth.targetFish ?? '';
+
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
           ...existingAuth,
           token, 
-          email: registeredEmail 
+          email: registeredEmail,
+          name: fetchedName,
+          targetFish: fetchedTargetFish
         }));
         
-        setIsLoggedIn(true); setLoggedInEmail(registeredEmail); setShowLoginModal(false); setShowWindyMenu(true);
+        setIsLoggedIn(true); 
+        setLoggedInEmail(registeredEmail); 
+        setUserName(fetchedName);
+        setTargetFish(fetchedTargetFish);
+        if (fetchedTargetFish) {
+          setActiveFishLayers([fetchedTargetFish]);
+        }
+
+        setShowLoginModal(false); 
+        setShowWindyMenu(true);
       } else {
         alert('アカウント登録が完了しました！ログインしてください。'); setIsSignUp(false);
       }
@@ -337,8 +358,20 @@ export default function HeatmapPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    setIsLoggedIn(false); setLoggedInEmail(null); setShowWindyMenu(false);
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (stored) {
+      try {
+        const auth = JSON.parse(stored);
+        // ★トークンだけ削除し、プロフィール情報(魚種など)は次回ログイン時のために残す
+        delete auth.token;
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+      } catch (err) {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+    }
+    setIsLoggedIn(false); 
+    setLoggedInEmail(null); 
+    setShowWindyMenu(false);
     setActiveFishLayers([]); // ログアウト時に魚種レイヤーもクリア
   };
 
@@ -359,13 +392,14 @@ export default function HeatmapPage() {
         const errBody = await res.json().catch(() => null);
         alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
-      alert('アカウントを削除しました。'); handleLogout();
+      alert('アカウントを削除しました。'); 
+      localStorage.removeItem(AUTH_STORAGE_KEY); // アカウント削除時は全クリア
+      handleLogout();
     } catch (err) {
       console.error(err); alert('削除処理中にエラーが発生しました。');
     }
   };
 
-  // プロフィールの保存とレイヤー切り替え処理
   const handleUpdateProfile = (newName: string, newTarget: string) => {
     setUserName(newName);
     setTargetFish(newTarget);
@@ -387,31 +421,35 @@ export default function HeatmapPage() {
     alert('プロフィールを保存しました！');
   };
 
+  // ★リロード時（更新時）にローカルストレージから確実に状態を復元する
   useEffect(() => {
-    queueMicrotask(() => {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        try {
-          const auth = JSON.parse(stored);
-          if (auth?.email) { 
-            setIsLoggedIn(true); 
-            setLoggedInEmail(auth.email); 
-            
-            if (auth.name) setUserName(auth.name);
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (stored) {
+      try {
+        const auth = JSON.parse(stored);
+        // トークンがある場合のみ「ログイン済み」と判定する
+        if (auth?.token) { 
+          setIsLoggedIn(true); 
+          if (auth.email) setLoggedInEmail(auth.email); 
+          
+          if (auth.name) setUserName(auth.name);
 
-            if (typeof auth.targetFish === 'string') {
-              setTargetFish(auth.targetFish);
-              setActiveFishLayers(auth.targetFish !== '' ? [auth.targetFish] : []);
-            } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
-              setTargetFish(auth.targetFish[0]);
-              setActiveFishLayers([auth.targetFish[0]]);
-            }
+          let fishToSet = '';
+          if (typeof auth.targetFish === 'string') {
+            fishToSet = auth.targetFish;
+          } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
+            fishToSet = auth.targetFish[0];
           }
-        } catch {
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          
+          if (fishToSet) {
+            setTargetFish(fishToSet);
+            setActiveFishLayers([fishToSet]);
+          }
         }
+      } catch {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
       }
-    });
+    }
   }, []);
 
   // ==========================================
@@ -607,13 +645,11 @@ export default function HeatmapPage() {
           new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
         );
 
-        // 1. 対象の魚種でフィルタ
         const targetFishPoints = allFishPoints.filter((p: any) => {
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           return selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
         });
 
-        // 2. 閾値（例: 0.05以上）でフィルタリングして、0（魚がいない地点）を除外する
         const THRESHOLD = 0.02; 
 
         const fishHeatData = targetFishPoints
@@ -624,10 +660,10 @@ export default function HeatmapPage() {
 
             return {
               location: new window.google.maps.LatLng(lat, lng),
-              weight: rawVal, // 0.0〜1.0 の値をそのまま weight に使用
+              weight: rawVal,
             };
           })
-          .filter((item) => item.weight >= THRESHOLD); // 閾値未満をカット！
+          .filter((item) => item.weight >= THRESHOLD);
 
         let fishGradient: string[];
         if (fishTheme === 'rainbow') {
@@ -635,23 +671,22 @@ export default function HeatmapPage() {
         } else if (fishTheme === 'colorblind') {
           fishGradient = ['rgba(230,159,0,0)', '#E69F00', '#56B4E9', '#009E73', '#F0E442'];
         } else {
-          // 紫 〜 赤紫 〜 橙 〜 黄色 を多段階にして滑らかにする
           fishGradient = [
-            'rgba(142, 36, 170, 0)',     // 外枠（透明）
-            'rgba(142, 36, 170, 0.6)',   // 深い紫（低濃度）
-            'rgba(186, 104, 200, 0.8)',  // 明るい紫
-            'rgba(239, 108, 0, 0.85)',   // 赤みのあるオレンジ
-            'rgba(255, 152, 0, 0.9)',    // オレンジ（中濃度）
-            'rgba(255, 193, 7, 0.95)',   // 山吹色
-            'rgba(255, 235, 59, 1.0)'    // 鮮やかな黄色（最高濃度・コア）
+            'rgba(142, 36, 170, 0)',     
+            'rgba(142, 36, 170, 0.6)',   
+            'rgba(186, 104, 200, 0.8)',  
+            'rgba(239, 108, 0, 0.85)',   
+            'rgba(255, 152, 0, 0.9)',    
+            'rgba(255, 193, 7, 0.95)',   
+            'rgba(255, 235, 59, 1.0)'    
           ];
         }
 
         fishHeatmapLayerRef.current.setData(fishHeatData);
         fishHeatmapLayerRef.current.setOptions({
           gradient: fishGradient,
-          radius: 40,          // 30 → 40 に広げて点のつなぎ目を滑らかに
-          maxIntensity: 3.0,   //  1.0 → 2.5〜3.5 に引き上げ（飽和を防ぐ）
+          radius: 40,
+          maxIntensity: 3.0,
           opacity: 0.85,
         });
       } else {
@@ -670,13 +705,10 @@ export default function HeatmapPage() {
   // 8.5. バックエンドAPI通信 (海況データ取得)
   // ==========================================
   useEffect(() => {
-    console.log("🟢 海況API取得のuseEffectが起動しました", { selectedFullDate });
-
     async function fetchOceanData() {
       setOceanLoading(true);
       setOceanError(null);
 
-      // 選択された日付から開始・終了日時を作成
       const year = selectedFullDate.getFullYear();
       const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
@@ -686,8 +718,6 @@ export default function HeatmapPage() {
 
       const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
       
-      console.log(`🔵 海況データAPI取得: 期間=${start} ~ ${end}`);
-
       try {
         const res = await fetch(url);
         if (!res.ok) {
@@ -698,11 +728,8 @@ export default function HeatmapPage() {
         oceanPointsRef.current = data;
         setOceanPointCount(data.length);
 
-        console.log("✅ 海況データ取得完了:", data);
-        
         setOceanDataVersion((v) => v + 1);
       } catch (err: any) {
-        console.error('❌ 海況データの予期せぬエラー:', err);
         setOceanError(err.message);
       } finally {
         setOceanLoading(false);
@@ -716,12 +743,8 @@ export default function HeatmapPage() {
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
   // ==========================================
   useEffect(() => {
-    console.log("🟢 魚種API取得のuseEffectが起動しました", { activeFishLayers, selectedFullDate });
-
     async function fetchFishData() {
-      // 未ログイン、または魚種が選択されていない場合はデータを空にしてスキップ
       if (!isLoggedIn || activeFishLayers.length === 0) {
-        console.log("🟡 未ログインまたは魚種未選択のため、魚種データをクリアします");
         fishPointsRef.current = [];
         setEdnaPinPoints([]);
         setHotpoints([]); 
@@ -729,12 +752,10 @@ export default function HeatmapPage() {
         return;
       }
 
-      // 選択された魚種名からIDリストを生成
       const fishIds: number[] = Array.from(
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
-      // バックエンドの datetime 型に合わせて ISOフォーマット (YYYY-MM-DDTHH:mm:ss) を作成
       const year = selectedFullDate.getFullYear();
       const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedFullDate.getDate()).padStart(2, '0');
@@ -742,32 +763,25 @@ export default function HeatmapPage() {
       const start = `${targetDateStr}T00:00:00`;
       const end = `${targetDateStr}T23:59:59`;
 
-      console.log(`🔵 魚種データAPI取得: 魚種IDs=[${fishIds.join(', ')}], 期間=${start} ~ ${end}`);
-
       try {
-        // 1. ヒートマップ用 eDNA予測データ取得
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 2. ピン表示用 eDNA実測データ取得
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 3. ホットポイント（漁場候補地）データ取得
         const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
         const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
 
-        // 4. サジェスト（提案テキスト）データ取得
         const suggestionRequests = fishIds.map((id) => {
           const suggestUrl = `${API_BASE_URL}/fish/${id}/suggestions`;
           return fetch(suggestUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        // 全てのリクエストを並列処理で待機
         const [predictionResults, pinResults, rawHotpoints, suggestionResults] = await Promise.all([
           Promise.all(predictionRequests),
           Promise.all(pinRequests),
@@ -775,12 +789,10 @@ export default function HeatmapPage() {
           Promise.all(suggestionRequests),
         ]);
 
-        // 2次元配列をフラット化
         const flatPred = predictionResults.flat();
         const flatPin = pinResults.flat();
         const flatSuggestions = suggestionResults.flat();
 
-        // 取得したサジェスト提案を Hotpoints の各データにマージ
         const enrichedHotpoints = rawHotpoints.map((hp: any) => {
           const suggestionObj = hp.fish_id 
             ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
@@ -791,18 +803,12 @@ export default function HeatmapPage() {
           };
         });
 
-        // ★ 2km以内の近接ポイントを間引く（2km圏内で最もスコアが高い地点のみ残す）
         const filteredHotpoints = filterNearbyHotpoints(enrichedHotpoints, 2.0);
 
-        // RefとStateにデータを反映
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
         setHotpoints(filteredHotpoints);
 
-        console.log("✅ 魚種ヒートマップ予測データ取得完了:", flatPred);
-        console.log("✅ 観測ピンデータ取得完了:", flatPin);
-        
-        // 地図レイヤーの再描画トリガーを発火
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('❌ 魚種データの予期せぬエラー:', err);
@@ -810,7 +816,7 @@ export default function HeatmapPage() {
     }
 
     fetchFishData();
-  }, [API_BASE_URL, activeFishLayers, selectedFullDate, isLoggedIn]); // ★ isLoggedIn を依存配列に追加
+  }, [API_BASE_URL, activeFishLayers, selectedFullDate, isLoggedIn]); 
 
 
   // ==========================================
@@ -842,7 +848,6 @@ export default function HeatmapPage() {
       script.onload = () => { if (!cancelled) initMap(); };
     }
 
-    // async 関数に変更
     async function initMap() {
       if (!mapRef.current) return;
       if (typeof window === 'undefined' || !window.google || !window.google.maps) return;
@@ -850,7 +855,6 @@ export default function HeatmapPage() {
       const google = window.google;
 
       try {
-        // ★ 必要なライブラリクラスを明示的にロードする
         const { Map } = await google.maps.importLibrary("maps") as any;
         const { HeatmapLayer } = await google.maps.importLibrary("visualization") as any;
 
@@ -922,14 +926,12 @@ export default function HeatmapPage() {
 
         setMapReady(true);
       } catch (err) {
-        console.error("Map initialization failed:", err);
         setMapLoadError("地図の初期化に失敗しました。");
       }
     }
     return () => { cancelled = true; };
   }, []);
 
-  // 観測ピン (eDNA) の描画エフェクト
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -967,20 +969,17 @@ export default function HeatmapPage() {
     });
   }, [ednaPinPoints, mapReady]);
  
- // サジェスト（Hotpoint）ピン描画
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
-    const google = window.google;
 
     hotpointMarkersRef.current.forEach(m => m.setMap(null));
     hotpointMarkersRef.current = [];
 
     hotpoints.forEach(hp => {
-      const marker = new google.maps.Marker({
+      const marker = new window.google.maps.Marker({
         position: { lat: hp.latitude, lng: hp.longitude },
         map: map,
-        // ★ iconプロパティを削除（または未指定）にすると、Google Maps標準の赤いピンになります
         title: '予測ポイント詳細'
       });
 
@@ -1098,19 +1097,18 @@ export default function HeatmapPage() {
           />
 
           {/* 右側レイヤー選択サイドバー */}
-<RightSidebar
-  showMarinePanel={showMarinePanel} 
-  setShowMarinePanel={setShowMarinePanel}
-  showFishPanel={showFishPanel} 
-  setShowFishPanel={setShowFishPanel}
-  activeMarineLayers={activeMarineLayers} 
-  setActiveMarineLayers={handleMarineLayersUpdate} // または setActiveMarineLayers
-  activeFishLayers={activeFishLayers} 
-  setActiveFishLayers={handleFishLayersUpdate}     // または setActiveFishLayers
-  
-  isLoggedIn={isLoggedIn}                 // ← これと
-  setShowLoginModal={setShowLoginModal}   // ← これを渡す
-/>
+          <RightSidebar
+            showMarinePanel={showMarinePanel} 
+            setShowMarinePanel={setShowMarinePanel}
+            showFishPanel={showFishPanel} 
+            setShowFishPanel={setShowFishPanel}
+            activeMarineLayers={activeMarineLayers} 
+            setActiveMarineLayers={handleMarineLayersUpdate}
+            activeFishLayers={activeFishLayers} 
+            setActiveFishLayers={handleFishLayersUpdate}
+            isLoggedIn={isLoggedIn}
+            setShowLoginModal={setShowLoginModal}
+          />
 
           {/* 左下動的凡例 */}
           <div style={{ position: 'absolute', bottom: '290px', left: '30px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 15 }}>
@@ -1171,8 +1169,6 @@ export default function HeatmapPage() {
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
         </div>
-
-        {/* モーダル・メニュー類 */}
         
         {/* ログイン・新規登録モーダル */}
         {showLoginModal && (
