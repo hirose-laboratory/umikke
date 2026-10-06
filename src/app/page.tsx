@@ -91,12 +91,12 @@ const getFishIdByName = (name: string): number => {
   if (name.includes('伊勢エビ') || name.includes('エビ')) return 2;
   if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
   if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
-  return 1;
+  return 1; // デフォルトID
 };
 
-// 2地点間の距離 (km) を計算する関数
+// 2地点間の距離 (km) を計算する関数 (球面三角法 / Haversine式)
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
+  const R = 6371; // 地球の半径 (km)
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -109,7 +109,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
-// 2km以内の近接ポイントを間引き
+// 2km以内の近接ポイントを間引き、最もスコアが高い地点だけを残す関数 (NMS)
 function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoint[] {
   const sorted = [...points].sort((a, b) => {
     const scoreA = Number(a.intensity_score ?? a.score ?? 0);
@@ -259,7 +259,7 @@ export default function HeatmapPage() {
   }, [fishTheme]);
 
   // ==========================================
-  // 6. ユーザー認証＆プロフィール機能
+  // 6. ユーザー認証機能
   // ==========================================
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
@@ -277,9 +277,10 @@ export default function HeatmapPage() {
       const token = data.token ?? data.access_token ?? '';
       const loggedEmail = data.email ?? email;
       
+      // ★バックエンドからのデータとローカルデータを統合
       const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
-      const fetchedName = data.name || existingAuth.name || '名無しアングラー';
-      const fetchedTargetFish = data.targetFish || existingAuth.targetFish || '';
+      const fetchedName = data.name ?? existingAuth.name ?? '名無しアングラー';
+      const fetchedTargetFish = data.targetFish ?? existingAuth.targetFish ?? '';
 
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
         ...existingAuth,
@@ -289,12 +290,15 @@ export default function HeatmapPage() {
         targetFish: fetchedTargetFish
       }));
       
+      // ★ログイン成功と同時にStateとレイヤーに反映
       setIsLoggedIn(true); 
       setLoggedInEmail(loggedEmail); 
       setUserName(fetchedName);
       setTargetFish(fetchedTargetFish);
       if (fetchedTargetFish) {
         setActiveFishLayers([fetchedTargetFish]);
+      } else {
+        setActiveFishLayers([]);
       }
       
       setShowLoginModal(false); 
@@ -323,8 +327,8 @@ export default function HeatmapPage() {
       const registeredEmail = data.email ?? email;
       if (token) {
         const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
-        const fetchedName = data.name || existingAuth.name || '名無しアングラー';
-        const fetchedTargetFish = data.targetFish || existingAuth.targetFish || '';
+        const fetchedName = data.name ?? existingAuth.name ?? '名無しアングラー';
+        const fetchedTargetFish = data.targetFish ?? existingAuth.targetFish ?? '';
 
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ 
           ...existingAuth,
@@ -358,6 +362,7 @@ export default function HeatmapPage() {
     if (stored) {
       try {
         const auth = JSON.parse(stored);
+        // ★トークンだけ削除し、プロフィール情報(魚種など)は次回ログイン時のために残す
         delete auth.token;
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
       } catch (err) {
@@ -367,7 +372,7 @@ export default function HeatmapPage() {
     setIsLoggedIn(false); 
     setLoggedInEmail(null); 
     setShowWindyMenu(false);
-    setActiveFishLayers([]);
+    setActiveFishLayers([]); // ログアウト時に魚種レイヤーもクリア
   };
 
   const handleDeleteAccount = async () => {
@@ -388,14 +393,14 @@ export default function HeatmapPage() {
         alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
       alert('アカウントを削除しました。'); 
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(AUTH_STORAGE_KEY); // アカウント削除時は全クリア
       handleLogout();
     } catch (err) {
       console.error(err); alert('削除処理中にエラーが発生しました。');
     }
   };
 
-  const handleUpdateProfile = async (newName: string, newTarget: string) => {
+  const handleUpdateProfile = (newName: string, newTarget: string) => {
     setUserName(newName);
     setTargetFish(newTarget);
 
@@ -407,58 +412,37 @@ export default function HeatmapPage() {
 
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     const auth = stored ? JSON.parse(stored) : {};
-    const updatedAuth = {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
       ...auth,
       name: newName,
       targetFish: newTarget 
-    };
-
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedAuth));
-
-    // バックエンド側でAPIが実装された段階でコメントアウトを解除して使用してください
-    /*
-    if (auth.token) {
-      try {
-        await fetch(`${API_BASE_URL}/users/profile`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${auth.token}`
-          },
-          body: JSON.stringify({ name: newName, targetFish: newTarget })
-        });
-      } catch (e) {
-        console.warn('バックエンド同期スキップ (ローカル保存完了)', e);
-      }
-    }
-    */
+    }));
 
     alert('プロフィールを保存しました！');
   };
 
-  // 初回読み込み・リロード時の復元処理
+  // ★リロード時（更新時）にローカルストレージから確実に状態を復元する
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (stored) {
       try {
         const auth = JSON.parse(stored);
-        
-        if (auth.name) setUserName(auth.name);
-        
-        let fishToSet = '';
-        if (typeof auth.targetFish === 'string') {
-          fishToSet = auth.targetFish;
-        } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
-          fishToSet = auth.targetFish[0];
-        }
-        if (fishToSet) {
-          setTargetFish(fishToSet);
-        }
-
+        // トークンがある場合のみ「ログイン済み」と判定する
         if (auth?.token) { 
           setIsLoggedIn(true); 
           if (auth.email) setLoggedInEmail(auth.email); 
+          
+          if (auth.name) setUserName(auth.name);
+
+          let fishToSet = '';
+          if (typeof auth.targetFish === 'string') {
+            fishToSet = auth.targetFish;
+          } else if (Array.isArray(auth.targetFish) && auth.targetFish.length > 0) {
+            fishToSet = auth.targetFish[0];
+          }
+          
           if (fishToSet) {
+            setTargetFish(fishToSet);
             setActiveFishLayers([fishToSet]);
           }
         }
@@ -495,7 +479,7 @@ export default function HeatmapPage() {
   }, [isPlaying]);
 
   // ==========================================
-  // 8. 地図レイヤー描画処理
+  // 8. 地図レイヤー描画処理 (海況・流速・魚種)
   // ==========================================
   const updateMapLayers = useCallback(() => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
@@ -716,6 +700,7 @@ export default function HeatmapPage() {
     updateMapLayers();
   }, [mapReady, oceanDataVersion, updateMapLayers]);
 
+
   // ==========================================
   // 8.5. バックエンドAPI通信 (海況データ取得)
   // ==========================================
@@ -833,6 +818,7 @@ export default function HeatmapPage() {
     fetchFishData();
   }, [API_BASE_URL, activeFishLayers, selectedFullDate, isLoggedIn]); 
 
+
   // ==========================================
   // 10. Google Maps 初期化 ＆ イベント設定
   // ==========================================
@@ -850,7 +836,7 @@ export default function HeatmapPage() {
     if (!script) {
       const newScript = document.createElement('script');
       newScript.id = scriptId;
-      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=weekly&loading=async`;
+      newScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization&v=3.64`;
       newScript.async = true; 
       newScript.defer = true;
       newScript.onload = () => { if (!cancelled) initMap(); };
@@ -1082,7 +1068,7 @@ export default function HeatmapPage() {
         {/* 地図キャンバス */}
         <div id="map" ref={mapRef} style={{ height: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }} />
 
-        {/* UIオーバーレイ */}
+        {/* pointer-events: none の影響を受けるコンテナ */}
         <div className="ui-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
 
           {/* ヘッダーロゴ */}
