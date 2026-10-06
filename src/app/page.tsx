@@ -913,11 +913,11 @@ export default function HeatmapPage() {
           const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           
           infoWindowRef.current?.setContent(`
-            <div style="padding: 12px; color: #333; font-size: 16px;">
-              <strong style="font-size: 18px; color: #0044cc;">観測ポイント詳細</strong><br/>
-              水温: <b>${nearestPoint.sst?.toFixed(1)} ℃</b><br/>
-              取得時間: ${timeStr}<br/>
-              <span style="font-size: 12px; color: #666;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</span>
+            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+              <div style="font-size: 24px; font-weight: bold; color: #0044cc; margin-bottom: 8px;">観測ポイント詳細</div>
+              <div style="font-size: 20px; color: #333;">水温: <b style="font-size: 22px;">${nearestPoint.sst?.toFixed(1)} ℃</b></div>
+              <div style="font-size: 20px; color: #333;">取得時間: ${timeStr}</div>
+              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
@@ -956,10 +956,10 @@ export default function HeatmapPage() {
         if (infoWindowRef.current) {
           const valDisplay = pin.value ?? pin.dna_copies ?? '検出あり';
           infoWindowRef.current.setContent(`
-            <div style="padding: 12px; color: #333; font-size: 16px;">
-              <strong style="font-size: 18px; color: #8e24aa;">📍 eDNA 観測ポイント</strong><br/>
-              <span style="font-size: 12px; color: #666;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</span><br/><br/>
-              数値: <b>${valDisplay}</b>
+            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+              <div style="font-size: 24px; font-weight: bold; color: #8e24aa; margin-bottom: 8px;">📍 eDNA 観測</div>
+              <div style="font-size: 20px; color: #333; margin-bottom: 4px;">数値: <b style="font-size: 22px;">${valDisplay}</b></div>
+              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
@@ -989,11 +989,11 @@ export default function HeatmapPage() {
           const scoreText = typeof displayScore === 'number' ? displayScore.toFixed(2) : displayScore;
 
           infoWindowRef.current.setContent(`
-            <div style="padding: 8px 12px; color: #333; font-family: sans-serif; line-height: 1.4;">
-              <div style="font-size: 18px; color: #00447c; margin-bottom: 4px;">予測ポイント詳細</div>
-              <div style="font-size: 16px; color: #555;">スコア: ${scoreText}</div>
-              <div style="font-size: 16px; color: #555;">取得時間: 12:00</div>
-              <div style="font-size: 14px; color: #666; margin-top: 2px;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
+            <div style="min-width: 260px; padding: 12px 16px; color: #333; font-family: sans-serif; line-height: 1.5;">
+              <div style="font-size: 24px; font-weight: bold; color: #00447c; margin-bottom: 8px;">予測ポイント詳細</div>
+              <div style="font-size: 20px; color: #333; font-weight: bold;">スコア: <span style="font-size: 22px;">${scoreText}</span></div>
+              <div style="font-size: 20px; color: #333;">取得時間: 12:00</div>
+              <div style="font-size: 15px; color: #666; margin-top: 10px;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
