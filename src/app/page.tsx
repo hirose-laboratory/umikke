@@ -213,19 +213,13 @@ export default function HeatmapPage() {
     });
   }, []);
 
+  // ラジオボタン制限（単一選択）を解除し、通常の複数選択可能に戻したハンドラ
   const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     if (!isLoggedIn) {
       setShowLoginModal(true);
       return;
     }
-    setActiveFishLayers((prev) => {
-      const next = typeof val === 'function' ? val(prev) : val;
-      const added = next.filter((item) => !prev.includes(item));
-      if (added.length > 0) {
-        return [added[added.length - 1]];
-      }
-      return next;
-    });
+    setActiveFishLayers(val);
   }, [isLoggedIn]);
 
   const selectedFullDate = useMemo(() => {
@@ -277,7 +271,6 @@ export default function HeatmapPage() {
       const token = data.token ?? data.access_token ?? '';
       const loggedEmail = data.email ?? email;
       
-      // ★バックエンドからのデータとローカルデータを統合
       const existingAuth = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
       const fetchedName = data.name ?? existingAuth.name ?? '名無しアングラー';
       const fetchedTargetFish = data.targetFish ?? existingAuth.targetFish ?? '';
@@ -290,7 +283,6 @@ export default function HeatmapPage() {
         targetFish: fetchedTargetFish
       }));
       
-      // ★ログイン成功と同時にStateとレイヤーに反映
       setIsLoggedIn(true); 
       setLoggedInEmail(loggedEmail); 
       setUserName(fetchedName);
@@ -362,7 +354,6 @@ export default function HeatmapPage() {
     if (stored) {
       try {
         const auth = JSON.parse(stored);
-        // ★トークンだけ削除し、プロフィール情報(魚種など)は次回ログイン時のために残す
         delete auth.token;
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
       } catch (err) {
@@ -372,7 +363,7 @@ export default function HeatmapPage() {
     setIsLoggedIn(false); 
     setLoggedInEmail(null); 
     setShowWindyMenu(false);
-    setActiveFishLayers([]); // ログアウト時に魚種レイヤーもクリア
+    setActiveFishLayers([]);
   };
 
   const handleDeleteAccount = async () => {
@@ -393,7 +384,7 @@ export default function HeatmapPage() {
         alert('アカウント削除に失敗しました: ' + (errBody?.message || `status ${res.status}`)); return;
       }
       alert('アカウントを削除しました。'); 
-      localStorage.removeItem(AUTH_STORAGE_KEY); // アカウント削除時は全クリア
+      localStorage.removeItem(AUTH_STORAGE_KEY);
       handleLogout();
     } catch (err) {
       console.error(err); alert('削除処理中にエラーが発生しました。');
@@ -421,13 +412,11 @@ export default function HeatmapPage() {
     alert('プロフィールを保存しました！');
   };
 
-  // ★リロード時（更新時）にローカルストレージから確実に状態を復元する
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (stored) {
       try {
         const auth = JSON.parse(stored);
-        // トークンがある場合のみ「ログイン済み」と判定する
         if (auth?.token) { 
           setIsLoggedIn(true); 
           if (auth.email) setLoggedInEmail(auth.email); 
