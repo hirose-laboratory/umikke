@@ -13,7 +13,6 @@ interface RightSidebarProps {
   activeFishLayers: string[];
   setActiveFishLayers: (layers: string[]) => void;
   isLoggedIn?: boolean;
-  // ▼ 追加: ログインモーダルを開くための関数を受け取る
   setShowLoginModal: (show: boolean) => void;
 }
 
@@ -30,10 +29,22 @@ export default function RightSidebar({
   activeFishLayers,
   setActiveFishLayers,
   isLoggedIn = false,
-  setShowLoginModal, // ▼ 追加
+  setShowLoginModal,
 }: RightSidebarProps) {
 
-  // 海況レイヤーの表示切り替え
+  // 海況ラジオボタン（水温 / クロロフィルa濃度）の切り替え処理
+  const handleRadioMarineLayer = (selectedLayer: 'sst' | 'chl') => {
+    if (activeMarineLayers.includes(selectedLayer)) {
+      // すでに選択されているものをクリックした場合は選択解除
+      setActiveMarineLayers(activeMarineLayers.filter(l => l !== selectedLayer));
+    } else {
+      // 既存の sst / chl を解除し、新たに選択された方をセット（current は保持）
+      const filtered = activeMarineLayers.filter(l => l !== 'sst' && l !== 'chl');
+      setActiveMarineLayers([...filtered, selectedLayer]);
+    }
+  };
+
+  // 独立チェックボックス（流向・流速）の切り替え
   const toggleMarineLayer = (layer: string) => {
     if (activeMarineLayers.includes(layer)) {
       setActiveMarineLayers(activeMarineLayers.filter(l => l !== layer));
@@ -69,15 +80,57 @@ export default function RightSidebar({
 
         {showMarinePanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={activeMarineLayers.includes('sst')} onChange={() => toggleMarineLayer('sst')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 水温
+            
+            {/* 🔵 青枠グループ（ラジオボタン表示：水温 / クロロフィルa濃度） */}
+            <div style={{
+              border: '3px solid #3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.15)',
+              borderRadius: '20px',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ fontSize: '20px', color: '#93c5fd', fontWeight: 'bold' }}>
+                ※ いずれか1つを選択
+              </div>
+
+              {/* 水温 */}
+              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="marineLayerGroup"
+                  checked={activeMarineLayers.includes('sst')} 
+                  onChange={() => handleRadioMarineLayer('sst')} 
+                  style={{ width: '36px', height: '36px', cursor: 'pointer', accentColor: '#3b82f6' }} 
+                />
+                水温
+              </label>
+
+              {/* クロロフィルa濃度 */}
+              <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="marineLayerGroup"
+                  checked={activeMarineLayers.includes('chl')} 
+                  onChange={() => handleRadioMarineLayer('chl')} 
+                  style={{ width: '36px', height: '36px', cursor: 'pointer', accentColor: '#3b82f6' }} 
+                />
+                クロロフィルa濃度
+              </label>
+            </div>
+
+            {/* ⬛ 独立チェックボックス：流向・流速 */}
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer', marginTop: '4px' }}>
+              <input 
+                type="checkbox" 
+                checked={activeMarineLayers.includes('current')} 
+                onChange={() => toggleMarineLayer('current')} 
+                style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} 
+              />
+              流向・流速
             </label>
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={activeMarineLayers.includes('chl')} onChange={() => toggleMarineLayer('chl')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> クロロフィルa濃度
-            </label>
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'white', fontSize: '28px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={activeMarineLayers.includes('current')} onChange={() => toggleMarineLayer('current')} style={{ width: '40px', height: '40px', cursor: 'pointer', accentColor: '#1a237e' }} /> 流向・流速
-            </label>
+
           </div>
         )}
       </div>
@@ -85,10 +138,10 @@ export default function RightSidebar({
       {/* 2. 魚種分布パネル (マダイ / ブリ / 伊勢エビ) */}
       <div className="layer-container" style={{ position: 'relative', background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        {/* ▼▼▼ 未ログイン時ブロックオーバーレイ（有効化＆クリック処理追加） ▼▼▼ */}
+        {/* 未ログイン時ブロックオーバーレイ */}
         {!isLoggedIn && (
           <div 
-            onClick={() => setShowLoginModal(true)} // クリックでログイン画面へ
+            onClick={() => setShowLoginModal(true)}
             style={{ 
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
               backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', 
@@ -99,13 +152,11 @@ export default function RightSidebar({
             <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '16px 28px', borderRadius: '40px', fontSize: '26px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span>🔒 ログインして機能を開放</span>
             </div>
-            {/* 前にいただいた要望のテキストも補足として追加しています */}
             <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginTop: '16px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
               ログインすると分布や予測が見れます
             </span>
           </div>
         )}
-        {/* ▲▲▲ 修正ここまで ▲▲▲ */}
 
         <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
