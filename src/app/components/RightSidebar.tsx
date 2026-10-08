@@ -35,10 +35,8 @@ export default function RightSidebar({
   // ラジオボタン切替（水温 / クロロフィルa濃度）
   const handleRadioMarineLayer = (selectedLayer: 'sst' | 'chl') => {
     if (activeMarineLayers.includes(selectedLayer)) {
-      // 選択済みの場合は解除
       setActiveMarineLayers(activeMarineLayers.filter(l => l !== selectedLayer));
     } else {
-      // もう片方を解除して自身を選択（current は維持）
       const filtered = activeMarineLayers.filter(l => l !== 'sst' && l !== 'chl');
       setActiveMarineLayers([...filtered, selectedLayer]);
     }
@@ -122,7 +120,6 @@ export default function RightSidebar({
                   boxShadow: isSstSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none'
                 }}
               >
-                {/* 丸型ラジオインジケーター */}
                 <span style={{
                   width: '22px',
                   height: '22px',
@@ -156,7 +153,6 @@ export default function RightSidebar({
                   boxShadow: isChlSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none'
                 }}
               >
-                {/* 丸型ラジオインジケーター */}
                 <span style={{
                   width: '22px',
                   height: '22px',
@@ -234,9 +230,16 @@ export default function RightSidebar({
         {/* パネルヘッダー */}
         <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            
+            {/* 修正箇所: SVGの魚アイコンに変更 */}
             <div className="layer-color purple" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#8e24aa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'white' }}>philippines</span>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6.5 12c.94-2.07 3.08-3.5 5.5-3.5c3.5 0 6.5 3.5 7.5 3.5c-1 0-4 3.5-7.5 3.5c-2.42 0-4.56-1.43-5.5-3.5z" />
+                <circle cx="15.5" cy="10.5" r="1" fill="white" />
+                <path d="M2 16l4.5-4L2 8" />
+              </svg>
             </div>
+
             <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
               <span className="layer-title" style={{ fontSize: '40px', fontWeight: 'bold', lineHeight: 1.2 }}>魚種分布</span>
               <span className="layer-sub" style={{ fontSize: '26px', color: '#cbd5e1', marginTop: '6px' }}>魚種カテゴリ別表示</span>
