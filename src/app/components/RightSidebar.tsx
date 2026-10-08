@@ -88,15 +88,14 @@ export default function RightSidebar({
         {showMarinePanel && (
           <div className="checkbox-panel" style={{ padding: '0 32px 32px 100px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* ▼▼▼ 工夫ポイント：単一選択（ラジオ）グループのカード囲み ▼▼▼ */}
+            {/* ▼ 単一選択（ラジオ）グループのサブカード（青ライン削除済み） ▼ */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
               padding: '16px 20px',
               backgroundColor: 'rgba(0, 0, 0, 0.12)',
-              borderRadius: '16px',
-              borderLeft: '5px solid #1a237e'
+              borderRadius: '16px'
             }}>
               
               {/* 🔵 ① 水温（選択時：濃紺背景＋白ドット） */}
@@ -146,7 +145,6 @@ export default function RightSidebar({
               </div>
 
             </div>
-            {/* ▲▲▲ 排他グループここまで ▲▲▲ */}
 
             {/* ⬛ ③ 流向・流速（独立した四角チェックボックス） */}
             <div 
