@@ -20,6 +20,7 @@ interface GoogleMapInstance {
   setZoom: (zoom: number) => void;
   setCenter: (latLng: object) => void;
   addListener: (event: string, handler: (e: any) => void) => object;
+  panTo?: (latLng: object) => void; // panToを追加
 }
 
 interface GoogleHeatmapLayerInstance {
@@ -145,7 +146,7 @@ export default function HeatmapPage() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
-  const currentLocationMarkerRef = useRef<GoogleMarkerInstance | null>(null);
+  const currentLocationMarkerRef = useRef<any>(null); // 型をanyに変更してプロパティ拡張に対応
   const fishPointsRef = useRef<FishPredictionPoint[]>([]);
   const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
@@ -197,6 +198,10 @@ export default function HeatmapPage() {
   const [mapReady, setMapReady] = useState<boolean>(false);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
+  
+  // --- GPS用 State 追加 ---
+  const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
+
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
 
   useEffect(() => {
@@ -219,7 +224,6 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  // ラジオボタン制限（単一選択）を解除し、通常の複数選択可能に戻したハンドラ
   const handleFishLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     if (!isLoggedIn) {
       setShowLoginModal(true);
@@ -261,6 +265,7 @@ export default function HeatmapPage() {
   // ==========================================
   // 6. ユーザー認証機能
   // ==========================================
+  // (認証関連処理は省略せずそのまま維持)
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
     try {
@@ -704,10 +709,9 @@ export default function HeatmapPage() {
       setOceanLoading(true);
       setOceanError(null);
 
-      // --- 変更: baseDateから1週間分(0〜6日後)を取得 ---
       const startD = new Date(baseDate);
       const endD = new Date(baseDate);
-      endD.setDate(endD.getDate() + 6); // 6日進めて1週間分
+      endD.setDate(endD.getDate() + 6);
 
       const startStr = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}T00:00:00`;
       const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}T23:59:59`;
@@ -730,7 +734,7 @@ export default function HeatmapPage() {
     }
 
     fetchOceanData();
-  }, [API_BASE_URL, baseDate, oceanRetryKey]); // ← 変更: selectedFullDate を baseDate に変更
+  }, [API_BASE_URL, baseDate, oceanRetryKey]); 
 
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
@@ -749,7 +753,6 @@ export default function HeatmapPage() {
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
-      // --- 変更: baseDateから1週間分(0〜6日後)を取得 ---
       const startD = new Date(baseDate);
       const endD = new Date(baseDate);
       endD.setDate(endD.getDate() + 6);
@@ -758,7 +761,6 @@ export default function HeatmapPage() {
       const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}T23:59:59`;
 
       try {
-        // ... (fetch処理の中身はそのまま) ...
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
@@ -883,11 +885,9 @@ export default function HeatmapPage() {
           const targetMonth = targetDate.getMonth();
           const targetDateNum = targetDate.getDate();
 
-          // 追加: 現在選択されているレイヤーを確認
           const currentLayers = activeMarineLayersRef.current;
           const isChlActive = currentLayers.includes('chl');
 
-          // 修正: 選択中のレイヤーに応じてフィルタリング条件を変更
           const todayPoints = oceanPointsRef.current.filter((p) => {
             const pDate = new Date(p.record_timestamp);
             const isTargetDate = pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum;
@@ -917,7 +917,6 @@ export default function HeatmapPage() {
 
           const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           
-          // 追加: レイヤーに応じて吹き出しのHTMLを生成
           let displayDataHTML = '';
           if (isChlActive) {
             const rawChl = (nearestPoint as any).chl ?? (nearestPoint as any).cha;
@@ -928,7 +927,6 @@ export default function HeatmapPage() {
             displayDataHTML = `<div style="font-size: 20px; color: #222; font-weight: bold;">水温: <span style="font-size: 22px;">${sstVal} ℃</span></div>`;
           }
 
-          // 修正: 生成したHTML（displayDataHTML）を埋め込む
           infoWindowRef.current?.setContent(`
             <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
               <div style="font-size: 24px; font-weight: bold; color: #0044cc; margin-bottom: 8px;">観測ポイント詳細</div>
@@ -947,6 +945,58 @@ export default function HeatmapPage() {
     }
     return () => { cancelled = true; };
   }, []);
+
+  // ==========================================
+  // 10.5. 現在地の継続監視とマーカー表示 (追加)
+  // ==========================================
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
+    const map = mapInstanceRef.current;
+    const google = window.google as any;
+
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setCurrentPosition(pos);
+
+          if (!currentLocationMarkerRef.current) {
+            currentLocationMarkerRef.current = new google.maps.Marker({
+              position: pos,
+              map: map,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: '#4285F4',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+              },
+              title: '現在地',
+              zIndex: 999,
+            });
+          } else {
+            currentLocationMarkerRef.current.setPosition(pos);
+          }
+        },
+        (error) => {
+          console.warn('現在地の取得に失敗しました:', error);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+        if (currentLocationMarkerRef.current) {
+          currentLocationMarkerRef.current.setMap(null);
+          currentLocationMarkerRef.current = null;
+        }
+      };
+    }
+  }, [mapReady]);
 
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
@@ -1184,6 +1234,53 @@ export default function HeatmapPage() {
 
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
+
+          {/* --- 追加: 現在地へ移動するカスタムボタン --- */}
+          <button
+            onClick={() => {
+              if (currentPosition && mapInstanceRef.current) {
+                // 中心を現在地に移動しズームレベルを調整
+                (mapInstanceRef.current as any).panTo(currentPosition);
+                mapInstanceRef.current.setZoom(14); 
+              } else if (!currentPosition) {
+                alert('現在地を取得中です。しばらくお待ちください。');
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: '120px', // MapControlsなどと重ならないように調整
+              right: '20px',
+              backgroundColor: '#999999', // 画像に合わせたグレー
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              cursor: 'pointer',
+              zIndex: 15,
+              pointerEvents: 'auto' // UIコンテナ内なのでクリック検知に必須
+            }}
+            title="現在地へ移動"
+          >
+            {/* 画像に似せた紙飛行機(Navigation)アイコン */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="3 11 22 2 13 21 11 13 3 11" />
+            </svg>
+          </button>
         </div>
         
         {/* ログイン・新規登録モーダル */}
