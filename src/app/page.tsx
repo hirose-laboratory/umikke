@@ -1235,52 +1235,7 @@ export default function HeatmapPage() {
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
 
-          {/* --- 追加: 現在地へ移動するカスタムボタン --- */}
-          <button
-            onClick={() => {
-              if (currentPosition && mapInstanceRef.current) {
-                // 中心を現在地に移動しズームレベルを調整
-                (mapInstanceRef.current as any).panTo(currentPosition);
-                mapInstanceRef.current.setZoom(14); 
-              } else if (!currentPosition) {
-                alert('現在地を取得中です。しばらくお待ちください。');
-              }
-            }}
-            style={{
-              position: 'absolute',
-              bottom: '120px', // MapControlsなどと重ならないように調整
-              right: '20px',
-              backgroundColor: '#999999', // 画像に合わせたグレー
-              color: 'white',
-              border: 'none',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-              cursor: 'pointer',
-              zIndex: 15,
-              pointerEvents: 'auto' // UIコンテナ内なのでクリック検知に必須
-            }}
-            title="現在地へ移動"
-          >
-            {/* 画像に似せた紙飛行機(Navigation)アイコン */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polygon points="3 11 22 2 13 21 11 13 3 11" />
-            </svg>
-          </button>
+          
         </div>
         
         {/* ログイン・新規登録モーダル */}
