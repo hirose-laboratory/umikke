@@ -704,25 +704,23 @@ export default function HeatmapPage() {
       setOceanLoading(true);
       setOceanError(null);
 
-      const year = selectedFullDate.getFullYear();
-      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedFullDate.getDate()).padStart(2, '0');
-      const targetDateStr = `${year}-${month}-${day}`;
-      const start = `${targetDateStr}T00:00:00`;
-      const end = `${targetDateStr}T23:59:59`;
+      // --- 変更: baseDateから1週間分(0〜6日後)を取得 ---
+      const startD = new Date(baseDate);
+      const endD = new Date(baseDate);
+      endD.setDate(endD.getDate() + 6); // 6日進めて1週間分
 
-      const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+      const startStr = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}T00:00:00`;
+      const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}T23:59:59`;
+
+      const url = `${API_BASE_URL}/ocean/range/?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
       
       try {
         const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
         
         oceanPointsRef.current = data;
         setOceanPointCount(data.length);
-
         setOceanDataVersion((v) => v + 1);
       } catch (err: any) {
         setOceanError(err.message);
@@ -732,7 +730,7 @@ export default function HeatmapPage() {
     }
 
     fetchOceanData();
-  }, [API_BASE_URL, selectedFullDate, oceanRetryKey]);
+  }, [API_BASE_URL, baseDate, oceanRetryKey]); // ← 変更: selectedFullDate を baseDate に変更
 
   // ==========================================
   // 9. バックエンドAPI通信 (海況 / eDNA予測 / 実測 / 提案)
@@ -751,27 +749,28 @@ export default function HeatmapPage() {
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
-      const year = selectedFullDate.getFullYear();
-      const month = String(selectedFullDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedFullDate.getDate()).padStart(2, '0');
-      const targetDateStr = `${year}-${month}-${day}`;
-      const start = `${targetDateStr}T00:00:00`;
-      const end = `${targetDateStr}T23:59:59`;
+      // --- 変更: baseDateから1週間分(0〜6日後)を取得 ---
+      const startD = new Date(baseDate);
+      const endD = new Date(baseDate);
+      endD.setDate(endD.getDate() + 6);
+
+      const startStr = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}T00:00:00`;
+      const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}T23:59:59`;
 
       try {
+        // ... (fetch処理の中身はそのまま) ...
         const predictionRequests = fishIds.map((id) => {
-          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+          const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
         const pinRequests = fishIds.map((id) => {
-          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
         const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
-
         const suggestionRequests = fishIds.map((id) => {
           const suggestUrl = `${API_BASE_URL}/fish/${id}/suggestions`;
           return fetch(suggestUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
@@ -803,7 +802,6 @@ export default function HeatmapPage() {
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
         setHotpoints(filteredHotpoints);
-
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('❌ 魚種データの予期せぬエラー:', err);
@@ -811,7 +809,7 @@ export default function HeatmapPage() {
     }
 
     fetchFishData();
-  }, [API_BASE_URL, activeFishLayers, selectedFullDate, isLoggedIn]); 
+  }, [API_BASE_URL, activeFishLayers, baseDate, isLoggedIn]);
 
 
   // ==========================================
