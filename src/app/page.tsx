@@ -197,6 +197,12 @@ export default function HeatmapPage() {
   const [mapReady, setMapReady] = useState<boolean>(false);
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
+  const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
+
+  useEffect(() => {
+    activeMarineLayersRef.current = activeMarineLayers;
+  }, [activeMarineLayers]);
+ 
 
   useEffect(() => {
     setIsMounted(true);
@@ -879,10 +885,22 @@ export default function HeatmapPage() {
           const targetMonth = targetDate.getMonth();
           const targetDateNum = targetDate.getDate();
 
+          // 追加: 現在選択されているレイヤーを確認
+          const currentLayers = activeMarineLayersRef.current;
+          const isChlActive = currentLayers.includes('chl');
+
+          // 修正: 選択中のレイヤーに応じてフィルタリング条件を変更
           const todayPoints = oceanPointsRef.current.filter((p) => {
-            if (p.sst === null || p.sst === undefined) return false;
             const pDate = new Date(p.record_timestamp);
-            return (pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum);
+            const isTargetDate = pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum;
+            if (!isTargetDate) return false;
+
+            if (isChlActive) {
+              const rawChl = (p as any).chl ?? (p as any).cha;
+              return rawChl !== null && rawChl !== undefined;
+            } else {
+              return p.sst !== null && p.sst !== undefined;
+            }
           });
 
           if (todayPoints.length === 0) return;
@@ -901,10 +919,22 @@ export default function HeatmapPage() {
 
           const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           
+          // 追加: レイヤーに応じて吹き出しのHTMLを生成
+          let displayDataHTML = '';
+          if (isChlActive) {
+            const rawChl = (nearestPoint as any).chl ?? (nearestPoint as any).cha;
+            const chlVal = rawChl !== null && rawChl !== undefined ? Number(rawChl).toFixed(1) : '--';
+            displayDataHTML = `<div style="font-size: 20px; color: #222; font-weight: bold;">クロロフィルa濃度 <span style="font-size: 22px;">${chlVal} mg/m³</span></div>`;
+          } else {
+            const sstVal = nearestPoint.sst !== null && nearestPoint.sst !== undefined ? nearestPoint.sst.toFixed(1) : '--';
+            displayDataHTML = `<div style="font-size: 20px; color: #222; font-weight: bold;">水温: <span style="font-size: 22px;">${sstVal} ℃</span></div>`;
+          }
+
+          // 修正: 生成したHTML（displayDataHTML）を埋め込む
           infoWindowRef.current?.setContent(`
             <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
               <div style="font-size: 24px; font-weight: bold; color: #0044cc; margin-bottom: 8px;">観測ポイント詳細</div>
-              <div style="font-size: 20px; color: #222; font-weight: bold;">水温: <span style="font-size: 22px;">${nearestPoint.sst?.toFixed(1)} ℃</span></div>
+              ${displayDataHTML}
               <div style="font-size: 20px; color: #222; font-weight: bold;">取得時間: <span style="font-size: 22px;">${timeStr}</span></div>
               <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</div>
             </div>
@@ -912,7 +942,6 @@ export default function HeatmapPage() {
           infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
           infoWindowRef.current?.open(map);
         });
-
         setMapReady(true);
       } catch (err) {
         setMapLoadError("地図の初期化に失敗しました。");
