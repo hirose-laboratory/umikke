@@ -753,6 +753,7 @@ export default function HeatmapPage() {
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
+      // --- baseDateから1週間分(0〜6日後)を取得 ---
       const startD = new Date(baseDate);
       const endD = new Date(baseDate);
       endD.setDate(endD.getDate() + 6);
@@ -765,12 +766,10 @@ export default function HeatmapPage() {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
-
         const pinRequests = fishIds.map((id) => {
           const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
-
         const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
         const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         const suggestionRequests = fishIds.map((id) => {
@@ -789,7 +788,13 @@ export default function HeatmapPage() {
         const flatPin = pinResults.flat();
         const flatSuggestions = suggestionResults.flat();
 
-        const enrichedHotpoints = rawHotpoints.map((hp: any) => {
+        // 🌟【修正箇所】取得した全ホットポイントから、現在選択されている魚種 (fishIds) のピンだけを抽出
+        const filteredRawHotpoints = rawHotpoints.filter((hp: any) => {
+          if (!hp.fish_id) return true; // fish_idが特定されていないものは残す
+          return fishIds.includes(Number(hp.fish_id));
+        });
+
+        const enrichedHotpoints = filteredRawHotpoints.map((hp: any) => {
           const suggestionObj = hp.fish_id 
             ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
             : null;
