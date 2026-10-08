@@ -104,29 +104,31 @@ export default function RightSidebar({
                 onClick={() => handleRadioMarineLayer('sst')}
                 style={{
                   flex: 1,
-                  padding: '18px 12px',
+                  padding: '16px 8px',
                   borderRadius: '14px',
                   border: isSstSelected ? '2px solid #60a5fa' : '2px solid transparent',
                   background: isSstSelected ? '#2563eb' : 'transparent',
                   color: isSstSelected ? '#ffffff' : '#94a3b8',
-                  fontSize: '26px',
+                  fontSize: '22px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '12px',
+                  gap: '8px',
+                  whiteSpace: 'nowrap',
                   transition: 'all 0.2s ease',
                   boxShadow: isSstSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none'
                 }}
               >
                 <span style={{
-                  width: '22px',
-                  height: '22px',
+                  width: '20px',
+                  height: '20px',
                   borderRadius: '50%',
-                  border: isSstSelected ? '6px solid #ffffff' : '2px solid #64748b',
+                  border: isSstSelected ? '5px solid #ffffff' : '2px solid #64748b',
                   backgroundColor: isSstSelected ? '#2563eb' : 'transparent',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  flexShrink: 0
                 }} />
                 水温
               </button>
@@ -137,31 +139,33 @@ export default function RightSidebar({
                 onClick={() => handleRadioMarineLayer('chl')}
                 style={{
                   flex: 1,
-                  padding: '18px 12px',
+                  padding: '16px 8px',
                   borderRadius: '14px',
                   border: isChlSelected ? '2px solid #60a5fa' : '2px solid transparent',
                   background: isChlSelected ? '#2563eb' : 'transparent',
                   color: isChlSelected ? '#ffffff' : '#94a3b8',
-                  fontSize: '26px',
+                  fontSize: '22px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '12px',
+                  gap: '8px',
+                  whiteSpace: 'nowrap',
                   transition: 'all 0.2s ease',
                   boxShadow: isChlSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none'
                 }}
               >
                 <span style={{
-                  width: '22px',
-                  height: '22px',
+                  width: '20px',
+                  height: '20px',
                   borderRadius: '50%',
-                  border: isChlSelected ? '6px solid #ffffff' : '2px solid #64748b',
+                  border: isChlSelected ? '5px solid #ffffff' : '2px solid #64748b',
                   backgroundColor: isChlSelected ? '#2563eb' : 'transparent',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  flexShrink: 0
                 }} />
-                クロロフィルa
+                クロロフィルa濃度
               </button>
             </div>
 
@@ -230,8 +234,6 @@ export default function RightSidebar({
         {/* パネルヘッダー */}
         <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
           <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            
-            {/* 修正箇所: SVGの魚アイコンに変更 */}
             <div className="layer-color purple" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#8e24aa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6.5 12c.94-2.07 3.08-3.5 5.5-3.5c3.5 0 6.5 3.5 7.5 3.5c-1 0-4 3.5-7.5 3.5c-2.42 0-4.56-1.43-5.5-3.5z" />
@@ -239,7 +241,6 @@ export default function RightSidebar({
                 <path d="M2 16l4.5-4L2 8" />
               </svg>
             </div>
-
             <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
               <span className="layer-title" style={{ fontSize: '40px', fontWeight: 'bold', lineHeight: 1.2 }}>魚種分布</span>
               <span className="layer-sub" style={{ fontSize: '26px', color: '#cbd5e1', marginTop: '6px' }}>魚種カテゴリ別表示</span>
