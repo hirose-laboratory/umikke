@@ -32,11 +32,13 @@ export default function RightSidebar({
   setShowLoginModal,
 }: RightSidebarProps) {
 
-  // 海況：水温とクロロフィルa濃度の排他切り替え（見た目はチェックボックスのまま裏で排他処理）
+  // 海況：水温とクロロフィルa濃度の排他切り替え（ラジオボタン動作）
   const handleRadioMarineLayer = (selectedLayer: 'sst' | 'chl') => {
     if (activeMarineLayers.includes(selectedLayer)) {
+      // 選択済みの場合は解除
       setActiveMarineLayers(activeMarineLayers.filter(l => l !== selectedLayer));
     } else {
+      // もう片方を解除して自身を選択（流向・流速 'current' は維持）
       const filtered = activeMarineLayers.filter(l => l !== 'sst' && l !== 'chl');
       setActiveMarineLayers([...filtered, selectedLayer]);
     }
@@ -51,7 +53,7 @@ export default function RightSidebar({
     }
   };
 
-  // 魚種レイヤー切替
+  // 魚種分布レイヤーの表示切り替え
   const toggleFishLayer = (fish: string) => {
     if (activeFishLayers.includes(fish)) {
       setActiveFishLayers(activeFishLayers.filter(f => f !== fish));
@@ -65,119 +67,86 @@ export default function RightSidebar({
   const isCurrentSelected = activeMarineLayers.includes('current');
 
   return (
-    <div 
-      className="right-sidebar" 
-      style={{ 
-        position: 'absolute', 
-        top: '120px', 
-        right: '30px', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '20px', 
-        pointerEvents: 'auto' 
-      }}
-    >
+    <div className="right-sidebar" style={{ position: 'absolute', top: '140px', right: '30px', display: 'flex', flexDirection: 'column', gap: '24px', pointerEvents: 'auto' }}>
       
       {/* ========================================== */}
-      {/* 1. 海況状況パネル */}
+      {/* 1. 海況状況パネル (水温 / クロロフィルa濃度 / 流向・流速) */}
       {/* ========================================== */}
-      <div 
-        className="layer-container" 
-        style={{ 
-          background: 'rgba(120, 120, 120, 0.92)', 
-          backdropFilter: 'blur(10px)', 
-          borderRadius: '28px', 
-          width: '500px', 
-          boxShadow: '0 10px 30px rgba(0,0,0,0.25)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          overflow: 'hidden' 
-        }}
-      >
+      <div className="layer-container" style={{ background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        
         {/* パネルヘッダー */}
-        <div 
-          onClick={() => setShowMarinePanel(!showMarinePanel)} 
-          style={{ 
-            color: 'white', 
-            padding: '28px 32px 20px 32px', 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            width: '100%', 
-            boxSizing: 'border-box' 
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* 濃紺の丸型アイコン */}
-            <div style={{ 
-              width: '64px', 
-              height: '64px', 
-              borderRadius: '50%', 
-              backgroundColor: '#112384', 
-              flexShrink: 0 
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '38px', fontWeight: 'bold', lineHeight: 1.1 }}>海況状況</span>
-              <span style={{ fontSize: '24px', color: '#e2e8f0', marginTop: '4px' }}>海況データ</span>
+        <div className="layer-btn" onClick={() => setShowMarinePanel(!showMarinePanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
+          <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div className="layer-color blue" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#1a237e' }}></div>
+            <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="layer-title" style={{ fontSize: '40px', fontWeight: 'bold', lineHeight: 1.2 }}>海況状況</span>
+              <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>海況データ</span>
             </div>
           </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'white' }}>
-            {showMarinePanel ? 'expand_more' : 'expand_less'}
-          </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showMarinePanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
-        {/* 海況チェックボックスリスト */}
+        {/* リスト部分 */}
         {showMarinePanel && (
-          <div style={{ padding: '8px 32px 32px 116px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* ① 水温 */}
+            {/* 🔵 ① 水温（丸型ラジオボタン） */}
             <div 
               onClick={() => handleRadioMarineLayer('sst')}
               style={{ display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', userSelect: 'none' }}
             >
+              {/* 丸型ラジオインジケーター */}
               <div style={{
                 width: '36px',
                 height: '36px',
-                borderRadius: '6px',
-                backgroundColor: isSstSelected ? '#112384' : '#ffffff',
+                borderRadius: '50%',
+                backgroundColor: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background-color 0.15s ease'
+                flexShrink: 0
               }}>
                 {isSstSelected && (
-                  <span style={{ color: 'white', fontSize: '26px', fontWeight: 'bold', lineHeight: 1 }}>✓</span>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: '#1a237e'
+                  }} />
                 )}
               </div>
-              <span style={{ color: 'white', fontSize: '32px', fontWeight: 'bold' }}>水温</span>
+              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'normal' }}>水温</span>
             </div>
 
-            {/* ② クロロフィルa濃度 */}
+            {/* 🔵 ② クロロフィルa濃度（丸型ラジオボタン） */}
             <div 
               onClick={() => handleRadioMarineLayer('chl')}
               style={{ display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', userSelect: 'none' }}
             >
+              {/* 丸型ラジオインジケーター */}
               <div style={{
                 width: '36px',
                 height: '36px',
-                borderRadius: '6px',
-                backgroundColor: isChlSelected ? '#112384' : '#ffffff',
+                borderRadius: '50%',
+                backgroundColor: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background-color 0.15s ease'
+                flexShrink: 0
               }}>
                 {isChlSelected && (
-                  <span style={{ color: 'white', fontSize: '26px', fontWeight: 'bold', lineHeight: 1 }}>✓</span>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: '#1a237e'
+                  }} />
                 )}
               </div>
-              <span style={{ color: 'white', fontSize: '32px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>クロロフィルa濃度</span>
+              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>クロロフィルa濃度</span>
             </div>
 
-            {/* ③ 流向・流速 */}
+            {/* ⬛ ③ 流向・流速（四角いチェックボックス） */}
             <div 
               onClick={() => toggleMarineLayer('current')}
               style={{ display: 'flex', alignItems: 'center', gap: '20px', cursor: 'pointer', userSelect: 'none' }}
@@ -186,18 +155,17 @@ export default function RightSidebar({
                 width: '36px',
                 height: '36px',
                 borderRadius: '6px',
-                backgroundColor: isCurrentSelected ? '#112384' : '#ffffff',
+                backgroundColor: isCurrentSelected ? '#1a237e' : '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background-color 0.15s ease'
+                flexShrink: 0
               }}>
                 {isCurrentSelected && (
                   <span style={{ color: 'white', fontSize: '26px', fontWeight: 'bold', lineHeight: 1 }}>✓</span>
                 )}
               </div>
-              <span style={{ color: 'white', fontSize: '32px', fontWeight: 'bold' }}>流向・流速</span>
+              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'normal' }}>流向・流速</span>
             </div>
 
           </div>
@@ -205,78 +173,45 @@ export default function RightSidebar({
       </div>
 
       {/* ========================================== */}
-      {/* 2. 魚種分布パネル */}
+      {/* 2. 魚種分布パネル (カタクチイワシ / ブリ / 伊勢エビ) */}
       {/* ========================================== */}
-      <div 
-        className="layer-container" 
-        style={{ 
-          position: 'relative', 
-          background: 'rgba(120, 120, 120, 0.92)', 
-          backdropFilter: 'blur(10px)', 
-          borderRadius: '28px', 
-          width: '500px', 
-          boxShadow: '0 10px 30px rgba(0,0,0,0.25)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          overflow: 'hidden' 
-        }}
-      >
+      <div className="layer-container" style={{ position: 'relative', background: '#888', borderRadius: '24px', width: '560px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        
         {/* 未ログイン時ブロックオーバーレイ */}
         {!isLoggedIn && (
           <div 
             onClick={() => setShowLoginModal(true)}
             style={{ 
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
-              backgroundColor: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', 
+              backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', 
               zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
               padding: '20px', cursor: 'pointer' 
             }}
           >
-            <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '14px 24px', borderRadius: '40px', fontSize: '22px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', color: 'white', padding: '16px 28px', borderRadius: '40px', fontSize: '26px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span>🔒 ログインして機能を開放</span>
             </div>
-            <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', marginTop: '12px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+            <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginTop: '16px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
               ログインすると分布や予測が見れます
             </span>
           </div>
         )}
 
         {/* パネルヘッダー */}
-        <div 
-          onClick={() => setShowFishPanel(!showFishPanel)} 
-          style={{ 
-            color: 'white', 
-            padding: '28px 32px 20px 32px', 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            width: '100%', 
-            boxSizing: 'border-box' 
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* 紫色の丸型アイコン */}
-            <div style={{ 
-              width: '64px', 
-              height: '64px', 
-              borderRadius: '50%', 
-              backgroundColor: '#8b24ad', 
-              flexShrink: 0 
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '38px', fontWeight: 'bold', lineHeight: 1.1 }}>魚種分布</span>
-              <span style={{ fontSize: '24px', color: '#e2e8f0', marginTop: '4px' }}>魚種カテゴリ別表示</span>
+        <div className="layer-btn" onClick={() => setShowFishPanel(!showFishPanel)} style={{ background: '#888', color: 'white', padding: '24px 32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box', border: 'none', textAlign: 'left' }}>
+          <div className="layer-left" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div className="layer-color purple" style={{ width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0, backgroundColor: '#8e24aa' }}></div>
+            <div className="layer-text" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="layer-title" style={{ fontSize: '40px', fontWeight: 'bold', lineHeight: 1.2 }}>魚種分布</span>
+              <span className="layer-sub" style={{ fontSize: '28px', color: '#e0e0e0', marginTop: '8px' }}>魚種カテゴリ別表示</span>
             </div>
           </div>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'white' }}>
-            {showFishPanel ? 'expand_more' : 'expand_less'}
-          </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px' }}>{showFishPanel ? 'expand_more' : 'expand_less'}</span>
         </div>
 
-        {/* 魚種チェックボックスリスト */}
+        {/* 魚種リスト（四角いチェックボックス） */}
         {showFishPanel && (
-          <div style={{ padding: '8px 32px 32px 116px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="checkbox-panel" style={{ padding: '0 32px 32px 120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {['カタクチイワシ', 'ブリ', '伊勢エビ'].map((fish) => {
               const isSelected = activeFishLayers.includes(fish);
               return (
@@ -289,18 +224,17 @@ export default function RightSidebar({
                     width: '36px',
                     height: '36px',
                     borderRadius: '6px',
-                    backgroundColor: isSelected ? '#8b24ad' : '#ffffff',
+                    backgroundColor: isSelected ? '#8e24aa' : '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexShrink: 0,
-                    transition: 'background-color 0.15s ease'
+                    flexShrink: 0
                   }}>
                     {isSelected && (
                       <span style={{ color: 'white', fontSize: '26px', fontWeight: 'bold', lineHeight: 1 }}>✓</span>
                     )}
                   </div>
-                  <span style={{ color: 'white', fontSize: '32px', fontWeight: 'bold' }}>{fish}</span>
+                  <span style={{ color: 'white', fontSize: '28px', fontWeight: 'normal' }}>{fish}</span>
                 </div>
               );
             })}
