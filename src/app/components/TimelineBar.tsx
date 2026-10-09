@@ -72,7 +72,7 @@ export default function TimelineBar({
       }}
     >
       {/* 上段：再生ボタン / タイムラインタブ / ミニカレンダーボタン */}
-      <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '24px' }}>
+      <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 'clamp(8px, 2vw, 24px)' }}>
         {/* 再生 / 一時停止ボタン */}
         <button
           className="play-btn"
@@ -104,7 +104,7 @@ export default function TimelineBar({
             display: 'flex',
             flexGrow: 1,
             justifyContent: 'space-between',
-            fontSize: '30px',
+            fontSize: 'clamp(12px, 2.3vw, 30px)', // パソコンでは30px、画面が小さくなると画面幅に合わせて縮小
             alignItems: 'center',
             overflow: 'hidden',
             whiteSpace: 'nowrap',
@@ -268,7 +268,7 @@ export default function TimelineBar({
           }}
         />
 
-        <div style={{ fontSize: '24px', textAlign: 'left', color: '#e0e0e0', fontWeight: 'bold', paddingLeft: '4px' }}>
+        <div style={{ fontSize: 'clamp(16px, 1.8vw, 24px)', textAlign: 'left', color: '#e0e0e0', fontWeight: 'bold', paddingLeft: '4px' }}>
           選択日: <span style={{ color: '#ffdd55' }}>{formattedSelectedDate}</span>
         </div>
       </div>
