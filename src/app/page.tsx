@@ -644,8 +644,7 @@ export default function HeatmapPage() {
         const selectedFishIds: number[] = Array.from(
           new Set(activeFishLayers.map((fishName) => getFishIdByName(fishName)))
         );
-        
-        // ▼▼▼ 修正箇所：ここで「魚種」と「日付」の両方で絞り込む ▼▼▼
+
         const targetFishPoints = allFishPoints.filter((p: any) => {
           // 1. 魚種の絞り込み
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
