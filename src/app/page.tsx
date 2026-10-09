@@ -20,7 +20,7 @@ interface GoogleMapInstance {
   setZoom: (zoom: number) => void;
   setCenter: (latLng: object) => void;
   addListener: (event: string, handler: (e: any) => void) => object;
-  panTo?: (latLng: object) => void;
+  panTo?: (latLng: object) => void; // panToを追加
 }
 
 interface GoogleHeatmapLayerInstance {
@@ -197,23 +197,22 @@ export default function HeatmapPage() {
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
 
-  // --- GPS用 State 追加 ---
-  const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
-
-  // レイヤー参照Ref
+  // --- GPS用 State 追加 --- 
+  const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null); 
+  
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
   const activeFishLayersRef = useRef<string[]>(activeFishLayers);
 
-  useEffect(() => {
-    activeMarineLayersRef.current = activeMarineLayers;
+  useEffect(() => { 
+    activeMarineLayersRef.current = activeMarineLayers; 
   }, [activeMarineLayers]);
 
   useEffect(() => {
     activeFishLayersRef.current = activeFishLayers;
   }, [activeFishLayers]);
 
-  useEffect(() => {
-    setIsMounted(true);
+  useEffect(() => { 
+    setIsMounted(true); 
   }, []);
 
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
@@ -839,16 +838,18 @@ export default function HeatmapPage() {
         ];
 
         heatmapLayerRef.current = new HeatmapLayer({ data: [], map: map, gradient: customGradient, radius: 20, opacity: 0.85 });
-        fishHeatmapLayerRef.current = new HeatmapLayer({ data: [], map: map, radius: 25, opacity: 0.85 });
+        fishHeatmapLayerRef.current = new HeatmapLayer({ data: [], map: map, radius: 35, opacity: 0.85 });
         infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
-        // ▼▼▼ マップクリック時の吹き出し制御（魚種選択時は紫枠スコア、海況選択時は既存青枠表示） ▼▼▼
+        // ▼▼▼ マップクリック時の吹き出し制御 ▼▼▼
         map.addListener('click', (e: any) => {
           const clickLat = e.latLng.lat();
           const clickLng = e.latLng.lng();
           const CLICK_TOLERANCE_KM = 5.0; // クリック判定の許容範囲（半径5km）
 
+          // --------------------------------------------------
           // 1. 周辺の「魚種データ（スコア）」を探す
+          // --------------------------------------------------
           let targetFishPoint = null;
           let minFishDistKm = Number.MAX_VALUE;
           const currentFishLayers = activeFishLayersRef.current || [];
@@ -873,7 +874,9 @@ export default function HeatmapPage() {
             }
           }
 
+          // --------------------------------------------------
           // 2. 周辺の「海況データ（水温・クロロフィル）」を探す
+          // --------------------------------------------------
           let targetMarinePoint = null;
           let minMarineDistKm = Number.MAX_VALUE;
           const currentMarineLayers = activeMarineLayersRef.current || [];
@@ -909,9 +912,14 @@ export default function HeatmapPage() {
             }
           }
 
-          // 3. 吹き出しの分岐表示
-          // 【パターンA】魚種データがヒットした場合
-          if (targetFishPoint && minFishDistKm <= CLICK_TOLERANCE_KM) {
+          // --------------------------------------------------
+          // 3. 吹き出しの分岐表示（魚種：紫枠 / 海況：青枠）
+          // --------------------------------------------------
+          const hasValidFish = targetFishPoint && minFishDistKm <= CLICK_TOLERANCE_KM;
+          const hasValidMarine = targetMarinePoint && minMarineDistKm <= CLICK_TOLERANCE_KM;
+
+          // 【パターンA】魚種データが有効で、海況データより近い（または海況データがない）場合
+          if (hasValidFish && (!hasValidMarine || minFishDistKm <= minMarineDistKm)) {
             const rawVal = Number((targetFishPoint as any).heatmap_value ?? (targetFishPoint as any).value ?? (targetFishPoint as any).score ?? 0);
             const scoreText = rawVal.toFixed(2);
             const fLat = Number((targetFishPoint as any).latitude ?? (targetFishPoint as any).lat ?? 0);
@@ -929,8 +937,8 @@ export default function HeatmapPage() {
             return;
           }
 
-          // 【パターンB】海況データがヒットした場合（元のまま変更なし）
-          if (targetMarinePoint && minMarineDistKm <= CLICK_TOLERANCE_KM) {
+          // 【パターンB】海況データ（水温・クロロフィル）がヒットした場合
+          if (hasValidMarine) {
             const timeStr = new Date(targetMarinePoint.record_timestamp.replace(' ', 'T')).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
             let displayDataHTML = '';
@@ -955,7 +963,7 @@ export default function HeatmapPage() {
             infoWindowRef.current?.open(map);
           }
         });
-        // ▲▲▲ クリック制御ここまで ▲▲▲
+        // ▲▲▲ 吹き出し制御ここまで ▲▲▲
 
         setMapReady(true);
       } catch (err) {
@@ -1190,7 +1198,7 @@ export default function HeatmapPage() {
 
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
-          
+
         </div>
         
         {/* ログイン・新規登録モーダル */}
