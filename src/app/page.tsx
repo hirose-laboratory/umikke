@@ -203,10 +203,15 @@ export default function HeatmapPage() {
   const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
 
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
+  const activeFishLayersRef = useRef<string[]>(activeFishLayers);
 
   useEffect(() => {
     activeMarineLayersRef.current = activeMarineLayers;
   }, [activeMarineLayers]);
+
+  useEffect(() => {
+    activeFishLayersRef.current = activeFishLayers;
+  }, [activeFishLayers]);
  
 
   useEffect(() => {
@@ -879,12 +884,59 @@ export default function HeatmapPage() {
           data: [], map: map, radius: 25, opacity: 0.85
         });
         
-        infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
-
         map.addListener('click', (e: any) => {
           const clickLat = e.latLng.lat();
           const clickLng = e.latLng.lng();
-          
+
+          // 1. 魚種レイヤーがアクティブな場合は、魚種の予測スコアを優先表示
+          const currentFishLayers = activeFishLayersRef.current;
+          if (currentFishLayers && currentFishLayers.length > 0) {
+            const allFishPoints = fishPointsRef.current;
+            const selectedFishIds = Array.from(new Set(currentFishLayers.map(getFishIdByName)));
+            
+            const targetFishPoints = allFishPoints.filter((p: any) => {
+              const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+              return selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
+            });
+
+            if (targetFishPoints.length > 0) {
+              let nearestFish = targetFishPoints[0];
+              let minFishDistance = Number.MAX_VALUE;
+              
+              for (const p of targetFishPoints) {
+                const pLat = Number((p as any).latitude ?? (p as any).lat ?? 0);
+                const pLng = Number((p as any).longitude ?? (p as any).lng ?? 0);
+                const dist = Math.pow(pLat - clickLat, 2) + Math.pow(pLng - clickLng, 2);
+                if (dist < minFishDistance) {
+                  minFishDistance = dist;
+                  nearestFish = p;
+                }
+              }
+
+              // クリックした場所の近くに魚種の予測ポイントがある場合
+              if (minFishDistance < 0.05) {
+                // 0.95などのスコア値を取得して小数第2位でフォーマット
+                const rawVal = Number((nearestFish as any).heatmap_value ?? (nearestFish as any).value ?? (nearestFish as any).score ?? 0);
+                const scoreText = rawVal.toFixed(2);
+                const fLat = Number((nearestFish as any).latitude ?? (nearestFish as any).lat ?? 0);
+                const fLng = Number((nearestFish as any).longitude ?? (nearestFish as any).lng ?? 0);
+                
+                infoWindowRef.current?.setContent(`
+                  <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
+                    <div style="font-size: 24px; font-weight: bold; color: #8e24aa; margin-bottom: 8px;">魚種予測スコア</div>
+                    <div style="font-size: 20px; color: #222; font-weight: bold;">スコア: <span style="font-size: 22px;">${scoreText}</span></div>
+                    <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${fLat.toFixed(4)}, Lng: ${fLng.toFixed(4)}</div>
+                  </div>
+                `);
+                infoWindowRef.current?.setPosition({ lat: fLat, lng: fLng });
+                infoWindowRef.current?.open(map);
+                
+                return; // 魚種のスコアを表示した場合は、ここで処理を終了（水温は出さない）
+              }
+            }
+          }
+
+          // 2. 魚種が非アクティブ、または近くに魚種データがない場合は既存の「海況データ（水温・クロロフィル）」を表示
           const targetDate = selectedFullDateRef.current;
           const targetYear = targetDate.getFullYear();
           const targetMonth = targetDate.getMonth();
