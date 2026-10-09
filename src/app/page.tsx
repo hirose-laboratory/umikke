@@ -203,6 +203,7 @@ export default function HeatmapPage() {
   const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
 
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
+  const activeFishLayersRef = useRef<string[]>(activeFishLayers);
 
   useEffect(() => {
     activeMarineLayersRef.current = activeMarineLayers;
@@ -212,6 +213,10 @@ export default function HeatmapPage() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    activeFishLayersRef.current = activeFishLayers;
+  }, [activeFishLayers]);
 
   const handleMarineLayersUpdate = useCallback((val: string[] | ((prev: string[]) => string[])) => {
     setActiveMarineLayers((prev) => {
@@ -881,68 +886,119 @@ export default function HeatmapPage() {
         
         infoWindowRef.current = new google.maps.InfoWindow({ maxWidth: 450 });
 
+        // ▼▼▼ マップクリック時の吹き出し制御 ▼▼▼
         map.addListener('click', (e: any) => {
           const clickLat = e.latLng.lat();
           const clickLng = e.latLng.lng();
+          const CLICK_TOLERANCE_KM = 5.0; // クリック判定の許容範囲（半径5km）
+
+          // 1. 周辺の「魚種データ」を探す
+          let targetFishPoint = null;
+          let minFishDistKm = Number.MAX_VALUE;
+          const currentFishLayers = activeFishLayersRef.current;
           
-          const targetDate = selectedFullDateRef.current;
-          const targetYear = targetDate.getFullYear();
-          const targetMonth = targetDate.getMonth();
-          const targetDateNum = targetDate.getDate();
+          if (currentFishLayers && currentFishLayers.length > 0) {
+            const allFishPoints = fishPointsRef.current;
+            const selectedFishIds = Array.from(new Set(currentFishLayers.map(getFishIdByName)));
+            const targetFishPoints = allFishPoints.filter((p: any) => {
+              const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
+              return selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
+            });
 
-          const currentLayers = activeMarineLayersRef.current;
-          const isChlActive = currentLayers.includes('chl');
+            for (const p of targetFishPoints) {
+              const pLat = Number((p as any).latitude ?? (p as any).lat ?? 0);
+              const pLng = Number((p as any).longitude ?? (p as any).lng ?? 0);
+              const distKm = getDistanceKm(pLat, pLng, clickLat, clickLng);
+              if (distKm < minFishDistKm) {
+                minFishDistKm = distKm;
+                targetFishPoint = p;
+              }
+            }
+          }
 
-          const todayPoints = oceanPointsRef.current.filter((p) => {
-            const pDate = new Date(p.record_timestamp);
-            const isTargetDate = pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum;
-            if (!isTargetDate) return false;
+          // 2. 周辺の「海況データ」を探す
+          let targetMarinePoint = null;
+          let minMarineDistKm = Number.MAX_VALUE;
+          const currentMarineLayers = activeMarineLayersRef.current;
+          const isChlActive = currentMarineLayers.includes('chl');
+          const isSstActive = currentMarineLayers.includes('sst');
 
+          if (isChlActive || isSstActive) {
+            const targetDate = selectedFullDateRef.current;
+            const targetYear = targetDate.getFullYear();
+            const targetMonth = targetDate.getMonth();
+            const targetDateNum = targetDate.getDate();
+
+            const todayPoints = oceanPointsRef.current.filter((p) => {
+              if (!p.record_timestamp) return false;
+              const pDate = new Date(p.record_timestamp.replace(' ', 'T'));
+              const isTargetDate = pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum;
+              if (!isTargetDate) return false;
+
+              if (isChlActive) {
+                const rawChl = (p as any).chl ?? (p as any).cha;
+                return rawChl !== null && rawChl !== undefined;
+              } else {
+                return p.sst !== null && p.sst !== undefined;
+              }
+            });
+
+            for (const p of todayPoints) {
+              const distKm = getDistanceKm(p.latitude, p.longitude, clickLat, clickLng);
+              if (distKm < minMarineDistKm) {
+                minMarineDistKm = distKm;
+                targetMarinePoint = p;
+              }
+            }
+          }
+
+          // 3. 吹き出しの優先判定と表示
+          // 魚種データが近くにあれば優先表示（ご希望の紫色の枠線 ＆ スコア表示）
+          if (targetFishPoint && minFishDistKm <= CLICK_TOLERANCE_KM) {
+            const rawVal = Number((targetFishPoint as any).heatmap_value ?? (targetFishPoint as any).value ?? (targetFishPoint as any).score ?? 0);
+            const scoreText = rawVal.toFixed(2);
+            const fLat = Number((targetFishPoint as any).latitude ?? (targetFishPoint as any).lat ?? 0);
+            const fLng = Number((targetFishPoint as any).longitude ?? (targetFishPoint as any).lng ?? 0);
+            
+            infoWindowRef.current?.setContent(`
+              <div style="min-width: 250px; padding: 16px; color: #222; font-family: sans-serif; line-height: 1.6; border: 3px solid #8e24aa; border-radius: 12px; background-color: #fff; box-sizing: border-box;">
+                <div style="font-size: 22px; font-weight: bold; color: #8e24aa; margin-bottom: 8px; border-bottom: 2px solid #8e24aa; padding-bottom: 4px;">魚種予測スコア</div>
+                <div style="font-size: 18px; color: #222; font-weight: bold; margin-top: 8px;">スコア: <span style="font-size: 24px; color: #8e24aa;">${scoreText}</span></div>
+                <div style="font-size: 14px; color: #666; margin-top: 8px; font-weight: 500;">Lat: ${fLat.toFixed(4)}, Lng: ${fLng.toFixed(4)}</div>
+              </div>
+            `);
+            infoWindowRef.current?.setPosition({ lat: fLat, lng: fLng });
+            infoWindowRef.current?.open(map);
+            return; // 魚種の吹き出しを出したらここで処理終了
+          }
+
+          // 魚種データがなく海況データがある場合（水温などの青い吹き出し）
+          if (targetMarinePoint && minMarineDistKm <= CLICK_TOLERANCE_KM) {
+            const timeStr = new Date(targetMarinePoint.record_timestamp.replace(' ', 'T')).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            
+            let displayDataHTML = '';
             if (isChlActive) {
-              const rawChl = (p as any).chl ?? (p as any).cha;
-              return rawChl !== null && rawChl !== undefined;
+              const rawChl = (targetMarinePoint as any).chl ?? (targetMarinePoint as any).cha;
+              const chlVal = rawChl !== null && rawChl !== undefined ? Number(rawChl).toFixed(1) : '--';
+              displayDataHTML = `<div style="font-size: 18px; color: #222; font-weight: bold; margin-top: 8px;">クロロフィルa濃度<br/><span style="font-size: 24px; color: #0044cc;">${chlVal} mg/m³</span></div>`;
             } else {
-              return p.sst !== null && p.sst !== undefined;
+              const sstVal = targetMarinePoint.sst !== null && targetMarinePoint.sst !== undefined ? targetMarinePoint.sst.toFixed(1) : '--';
+              displayDataHTML = `<div style="font-size: 18px; color: #222; font-weight: bold; margin-top: 8px;">水温: <span style="font-size: 24px; color: #0044cc;">${sstVal} ℃</span></div>`;
             }
-          });
 
-          if (todayPoints.length === 0) return;
-
-          let nearestPoint = todayPoints[0];
-          let minDistance = Number.MAX_VALUE;
-          for (const p of todayPoints) {
-            const dist = Math.pow(p.latitude - clickLat, 2) + Math.pow(p.longitude - clickLng, 2);
-            if (dist < minDistance) {
-              minDistance = dist;
-              nearestPoint = p;
-            }
+            infoWindowRef.current?.setContent(`
+              <div style="min-width: 250px; padding: 16px; color: #222; font-family: sans-serif; line-height: 1.6; border: 3px solid #0044cc; border-radius: 12px; background-color: #fff; box-sizing: border-box;">
+                <div style="font-size: 22px; font-weight: bold; color: #0044cc; margin-bottom: 8px; border-bottom: 2px solid #0044cc; padding-bottom: 4px;">海況データ</div>
+                ${displayDataHTML}
+                <div style="font-size: 16px; color: #444; font-weight: bold; margin-top: 8px;">取得時間: <span style="font-size: 18px;">${timeStr}</span></div>
+                <div style="font-size: 14px; color: #666; margin-top: 8px; font-weight: 500;">Lat: ${targetMarinePoint.latitude.toFixed(4)}, Lng: ${targetMarinePoint.longitude.toFixed(4)}</div>
+              </div>
+            `);
+            infoWindowRef.current?.setPosition({ lat: targetMarinePoint.latitude, lng: targetMarinePoint.longitude });
+            infoWindowRef.current?.open(map);
           }
-
-          if (minDistance > 0.05) return;
-
-          const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          
-          let displayDataHTML = '';
-          if (isChlActive) {
-            const rawChl = (nearestPoint as any).chl ?? (nearestPoint as any).cha;
-            const chlVal = rawChl !== null && rawChl !== undefined ? Number(rawChl).toFixed(1) : '--';
-            displayDataHTML = `<div style="font-size: 20px; color: #222; font-weight: bold;">クロロフィルa濃度 <span style="font-size: 22px;">${chlVal} mg/m³</span></div>`;
-          } else {
-            const sstVal = nearestPoint.sst !== null && nearestPoint.sst !== undefined ? nearestPoint.sst.toFixed(1) : '--';
-            displayDataHTML = `<div style="font-size: 20px; color: #222; font-weight: bold;">水温: <span style="font-size: 22px;">${sstVal} ℃</span></div>`;
-          }
-
-          infoWindowRef.current?.setContent(`
-            <div style="min-width: 270px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
-              <div style="font-size: 24px; font-weight: bold; color: #0044cc; margin-bottom: 8px;">観測ポイント詳細</div>
-              ${displayDataHTML}
-              <div style="font-size: 20px; color: #222; font-weight: bold;">取得時間: <span style="font-size: 22px;">${timeStr}</span></div>
-              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${nearestPoint.latitude.toFixed(4)}, Lng: ${nearestPoint.longitude.toFixed(4)}</div>
-            </div>
-          `);
-          infoWindowRef.current?.setPosition({ lat: nearestPoint.latitude, lng: nearestPoint.longitude });
-          infoWindowRef.current?.open(map);
         });
+        // ▲▲▲ クリック制御ここまで ▲▲▲
         setMapReady(true);
       } catch (err) {
         setMapLoadError("地図の初期化に失敗しました。");
