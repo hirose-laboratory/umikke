@@ -203,7 +203,6 @@ export default function HeatmapPage() {
   const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
 
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
-  
 
   useEffect(() => {
     activeMarineLayersRef.current = activeMarineLayers;
