@@ -20,7 +20,7 @@ interface GoogleMapInstance {
   setZoom: (zoom: number) => void;
   setCenter: (latLng: object) => void;
   addListener: (event: string, handler: (e: any) => void) => object;
-  panTo?: (latLng: object) => void; // panToを追加
+  panTo?: (latLng: object) => void;
 }
 
 interface GoogleHeatmapLayerInstance {
@@ -85,6 +85,9 @@ interface Hotpoint {
   fish_id?: number;
   suggestion?: string;
   intensity_score?: number;
+  target_timestamp?: string;
+  record_timestamp?: string;
+  created_at?: string;
 }
 
 // 魚種名からバックエンドの固有ID(1, 2, 3...)へ変換する関数
@@ -92,12 +95,12 @@ const getFishIdByName = (name: string): number => {
   if (name.includes('伊勢エビ') || name.includes('エビ')) return 2;
   if (name.includes('ブリ') || name.includes('ワラサ') || name.includes('ハマチ')) return 3;
   if (name.includes('イワシ') || name.includes('カタクチ')) return 1;
-  return 1; // デフォルトID
+  return 1;
 };
 
-// 2地点間の距離 (km) を計算する関数 (球面三角法 / Haversine式)
+// 2地点間の距離 (km) を計算する関数 (Haversine式)
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // 地球の半径 (km)
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -110,7 +113,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
-// 2km以内の近接ポイントを間引き、最もスコアが高い地点だけを残す関数 (NMS)
+// 近接ポイントを間引く関数 (NMS)
 function filterNearbyHotpoints(points: Hotpoint[], minDistanceKm = 2.0): Hotpoint[] {
   const sorted = [...points].sort((a, b) => {
     const scoreA = Number(a.intensity_score ?? a.score ?? 0);
@@ -146,7 +149,7 @@ export default function HeatmapPage() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const heatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
-  const currentLocationMarkerRef = useRef<any>(null); // 型をanyに変更してプロパティ拡張に対応
+  const currentLocationMarkerRef = useRef<any>(null);
   const fishPointsRef = useRef<FishPredictionPoint[]>([]);
   const fishHeatmapLayerRef = useRef<GoogleHeatmapLayerInstance | null>(null);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
@@ -191,6 +194,7 @@ export default function HeatmapPage() {
   const [targetFish, setTargetFish] = useState<string>(''); 
 
   const [oceanLoading, setOceanLoading] = useState<boolean>(true);
+  const [isFishLoading, setIsFishLoading] = useState<boolean>(false);
   const [oceanError, setOceanError] = useState<string | null>(null);
   const [oceanDataVersion, setOceanDataVersion] = useState<number>(0);
   const [oceanPointCount, setOceanPointCount] = useState<number>(0);
@@ -199,15 +203,18 @@ export default function HeatmapPage() {
   const [mapLoadError, setMapLoadError] = useState<string | null>(null);
   const [oceanRetryKey, setOceanRetryKey] = useState<number>(0);
   
-  // --- GPS用 State 追加 ---
   const [currentPosition, setCurrentPosition] = useState<{lat: number, lng: number} | null>(null);
 
   const activeMarineLayersRef = useRef<string[]>(activeMarineLayers);
+  const activeFishLayersRef = useRef<string[]>(activeFishLayers);
 
   useEffect(() => {
     activeMarineLayersRef.current = activeMarineLayers;
   }, [activeMarineLayers]);
- 
+
+  useEffect(() => {
+    activeFishLayersRef.current = activeFishLayers;
+  }, [activeFishLayers]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -265,7 +272,6 @@ export default function HeatmapPage() {
   // ==========================================
   // 6. ユーザー認証機能
   // ==========================================
-  // (認証関連処理は省略せずそのまま維持)
   const handleEmailLogin = async () => {
     if (!email || !password) { alert('メールアドレスとパスワードを入力してください。'); return; }
     try {
@@ -470,13 +476,20 @@ export default function HeatmapPage() {
     return `${y}年${m}月${d}日`;
   }, [selectedFullDate]);
 
+  // アニメーション表示（読み込み完了時のみ1.5秒間隔でコマを進める）
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isPlaying) {
-      intervalId = setInterval(() => { setCurrentProgress((prev) => (prev + 1) % 7); }, 1000);
+      if (oceanLoading || isFishLoading) {
+        setIsPlaying(false);
+        return;
+      }
+      intervalId = setInterval(() => { 
+        setCurrentProgress((prev) => (prev + 1) % 7); 
+      }, 1500);
     }
     return () => { if (intervalId) clearInterval(intervalId); };
-  }, [isPlaying]);
+  }, [isPlaying, oceanLoading, isFishLoading]);
 
   // ==========================================
   // 8. 地図レイヤー描画処理 (海況・流速・魚種)
@@ -646,13 +659,11 @@ export default function HeatmapPage() {
         );
 
         const targetFishPoints = allFishPoints.filter((p: any) => {
-          // 1. 魚種の絞り込み
           const currentFishId = Number(p?.fish_id ?? p?.fishId ?? 0);
           const isTargetFish = selectedFishIds.length === 0 || selectedFishIds.includes(currentFishId);
           if (!isTargetFish) return false;
 
-          // 2. スライダーで選択された「日付」の絞り込み（★追加部分）
-          if (!p.target_timestamp) return true; // 万が一タイムスタンプがない場合は表示
+          if (!p.target_timestamp) return true;
           const safeTimestamp = p.target_timestamp.replace(' ', 'T');
           const pDate = new Date(safeTimestamp);
           
@@ -762,6 +773,7 @@ export default function HeatmapPage() {
         return;
       }
 
+      setIsFishLoading(true);
       const fishIds: number[] = Array.from(
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
@@ -801,9 +813,8 @@ export default function HeatmapPage() {
         const flatPin = pinResults.flat();
         const flatSuggestions = suggestionResults.flat();
 
-        // 🌟【修正箇所】取得した全ホットポイントから、現在選択されている魚種 (fishIds) のピンだけを抽出
         const filteredRawHotpoints = rawHotpoints.filter((hp: any) => {
-          if (!hp.fish_id) return true; // fish_idが特定されていないものは残す
+          if (!hp.fish_id) return true;
           return fishIds.includes(Number(hp.fish_id));
         });
 
@@ -825,6 +836,8 @@ export default function HeatmapPage() {
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('❌ 魚種データの予期せぬエラー:', err);
+      } finally {
+        setIsFishLoading(false);
       }
     }
 
@@ -903,11 +916,55 @@ export default function HeatmapPage() {
           const targetMonth = targetDate.getMonth();
           const targetDateNum = targetDate.getDate();
 
-          const currentLayers = activeMarineLayersRef.current;
-          const isChlActive = currentLayers.includes('chl');
+          const currentFishLayers = activeFishLayersRef.current;
+
+          // 1. 魚種分布レイヤーが有効な場合は「予測スコア」を出力
+          if (currentFishLayers.length > 0 && fishPointsRef.current && fishPointsRef.current.length > 0) {
+            let nearestFish: any = null;
+            let minFishDist = Number.MAX_VALUE;
+            const selectedFishIds = Array.from(new Set(currentFishLayers.map(getFishIdByName)));
+
+            for (const p of fishPointsRef.current) {
+              const currentFishId = Number(p?.fish_id ?? 0);
+              if (selectedFishIds.length > 0 && !selectedFishIds.includes(currentFishId)) continue;
+
+              if (p.target_timestamp) {
+                const safeTimestamp = p.target_timestamp.replace(' ', 'T');
+                const pDate = new Date(safeTimestamp);
+                if (pDate.getFullYear() !== targetYear || pDate.getMonth() !== targetMonth || pDate.getDate() !== targetDateNum) {
+                  continue;
+                }
+              }
+
+              const dist = Math.pow(Number(p.latitude) - clickLat, 2) + Math.pow(Number(p.longitude) - clickLng, 2);
+              if (dist < minFishDist) {
+                minFishDist = dist;
+                nearestFish = p;
+              }
+            }
+
+            if (minFishDist < 0.05 && nearestFish) {
+              const rawVal = Number(nearestFish.heatmap_value ?? nearestFish.score ?? nearestFish.value ?? 0);
+              infoWindowRef.current?.setContent(`
+                <div style="min-width: 250px; padding: 12px 16px; color: #222; font-family: sans-serif; line-height: 1.6;">
+                  <div style="font-size: 24px; font-weight: bold; color: #8e24aa; margin-bottom: 8px;">魚種予測ポイント</div>
+                  <div style="font-size: 20px; color: #222; font-weight: bold;">スコア: <span style="font-size: 22px; color: #8e24aa;">${rawVal.toFixed(2)}</span></div>
+                  <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${Number(nearestFish.latitude).toFixed(4)}, Lng: ${Number(nearestFish.longitude).toFixed(4)}</div>
+                </div>
+              `);
+              infoWindowRef.current?.setPosition({ lat: Number(nearestFish.latitude), lng: Number(nearestFish.longitude) });
+              infoWindowRef.current?.open(map);
+              return;
+            }
+          }
+
+          // 2. 海況データ（水温 / クロロフィル）を表示
+          const currentMarineLayers = activeMarineLayersRef.current;
+          const isChlActive = currentMarineLayers.includes('chl');
 
           const todayPoints = oceanPointsRef.current.filter((p) => {
-            const pDate = new Date(p.record_timestamp);
+            const safeTimestamp = p.record_timestamp?.replace(' ', 'T');
+            const pDate = new Date(safeTimestamp);
             const isTargetDate = pDate.getFullYear() === targetYear && pDate.getMonth() === targetMonth && pDate.getDate() === targetDateNum;
             if (!isTargetDate) return false;
 
@@ -933,7 +990,7 @@ export default function HeatmapPage() {
 
           if (minDistance > 0.05) return;
 
-          const timeStr = new Date(nearestPoint.record_timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const timeStr = new Date(nearestPoint.record_timestamp.replace(' ', 'T')).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           
           let displayDataHTML = '';
           if (isChlActive) {
@@ -965,7 +1022,7 @@ export default function HeatmapPage() {
   }, []);
 
   // ==========================================
-  // 10.5. 現在地の継続監視とマーカー表示 (追加)
+  // 10.5. 現在地の継続監視とマーカー表示
   // ==========================================
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || typeof window === 'undefined' || !window.google) return;
@@ -1016,6 +1073,7 @@ export default function HeatmapPage() {
     }
   }, [mapReady]);
 
+  // eDNA マーカー描画（選択された日付に連動）
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -1024,7 +1082,19 @@ export default function HeatmapPage() {
     ednaMarkersRef.current.forEach(m => m.setMap(null));
     ednaMarkersRef.current = [];
 
-    ednaPinPoints.forEach(pin => {
+    const targetYear = selectedFullDate.getFullYear();
+    const targetMonth = selectedFullDate.getMonth();
+    const targetDateNum = selectedFullDate.getDate();
+
+    const todayEdnaPins = ednaPinPoints.filter((pin: any) => {
+      const ts = pin.sample_date || pin.record_timestamp || pin.target_timestamp;
+      if (!ts) return true;
+      const safeTimestamp = String(ts).replace(' ', 'T');
+      const d = new Date(safeTimestamp);
+      return d.getFullYear() === targetYear && d.getMonth() === targetMonth && d.getDate() === targetDateNum;
+    });
+
+    todayEdnaPins.forEach(pin => {
       const lat = Number(pin.latitude);
       const lng = Number(pin.longitude);
       if (!lat || !lng) return;
@@ -1051,8 +1121,9 @@ export default function HeatmapPage() {
       });
       ednaMarkersRef.current.push(marker);
     });
-  }, [ednaPinPoints, mapReady]);
+  }, [ednaPinPoints, mapReady, selectedFullDate]);
  
+  // ホットポイントマーカー描画（選択された日付に連動）
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.google) return;
     const map = mapInstanceRef.current;
@@ -1060,9 +1131,21 @@ export default function HeatmapPage() {
     hotpointMarkersRef.current.forEach(m => m.setMap(null));
     hotpointMarkersRef.current = [];
 
-    hotpoints.forEach(hp => {
+    const targetYear = selectedFullDate.getFullYear();
+    const targetMonth = selectedFullDate.getMonth();
+    const targetDateNum = selectedFullDate.getDate();
+
+    const todayHotpoints = hotpoints.filter((hp: any) => {
+      const ts = hp.target_timestamp || hp.record_timestamp || hp.created_at;
+      if (!ts) return true;
+      const safeTimestamp = String(ts).replace(' ', 'T');
+      const d = new Date(safeTimestamp);
+      return d.getFullYear() === targetYear && d.getMonth() === targetMonth && d.getDate() === targetDateNum;
+    });
+
+    todayHotpoints.forEach(hp => {
       const marker = new window.google.maps.Marker({
-        position: { lat: hp.latitude, lng: hp.longitude },
+        position: { lat: Number(hp.latitude), lng: Number(hp.longitude) },
         map: map,
         title: '予測ポイント詳細'
       });
@@ -1077,7 +1160,7 @@ export default function HeatmapPage() {
               <div style="font-size: 24px; font-weight: bold; color: #00447c; margin-bottom: 8px;">予測ポイント詳細</div>
               <div style="font-size: 20px; color: #222; font-weight: bold;">スコア: <span style="font-size: 22px;">${scoreText}</span></div>
               <div style="font-size: 20px; color: #222; font-weight: bold;">取得時間: <span style="font-size: 22px;">12:00</span></div>
-              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${hp.latitude.toFixed(4)}, Lng: ${hp.longitude.toFixed(4)}</div>
+              <div style="font-size: 18px; color: #444; margin-top: 8px; font-weight: 500;">Lat: ${Number(hp.latitude).toFixed(4)}, Lng: ${Number(hp.longitude).toFixed(4)}</div>
             </div>
           `);
           infoWindowRef.current.open(map, marker);
@@ -1085,7 +1168,7 @@ export default function HeatmapPage() {
       });
       hotpointMarkersRef.current.push(marker);
     });
-  }, [hotpoints, mapReady]);
+  }, [hotpoints, mapReady, selectedFullDate]);
 
   // ==========================================
   // 11. カレンダー ＆ マップコントロール処理
@@ -1222,7 +1305,7 @@ export default function HeatmapPage() {
           </div>
 
           {/* 左上データ取得ステータス表示 */}
-          {(oceanLoading || oceanError) && (
+          {(oceanLoading || isFishLoading || oceanError) && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: oceanError ? '#c62828' : '#555', color: 'white', padding: '16px 28px', borderRadius: '30px', fontSize: '24px', boxShadow: '0 4px 8px rgba(0,0,0,0.2)', pointerEvents: oceanError ? 'auto' : 'none', display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '80vw' }}>
               <span>{oceanError ? `データ取得エラー: ${oceanError}` : 'データを同期中...'}</span>
               {oceanError && (
@@ -1230,7 +1313,7 @@ export default function HeatmapPage() {
               )}
             </div>
           )}
-          {!oceanLoading && !oceanError && oceanPointCount > 0 && (
+          {!oceanLoading && !isFishLoading && !oceanError && oceanPointCount > 0 && (
             <div style={{ position: 'absolute', top: '30px', left: '30px', background: 'rgba(0,0,0,0.55)', color: 'white', padding: '10px 22px', borderRadius: '30px', fontSize: '20px', pointerEvents: 'none' }}>
               全 {oceanPointCount.toLocaleString()} 件から抽出（日単位表示）
             </div>
@@ -1253,7 +1336,6 @@ export default function HeatmapPage() {
           {/* 右下マップ操作ボタン */}
           <MapControls handleZoom={handleZoom} handleJumpToCurrentLocation={handleJumpToCurrentLocation} />
 
-          
         </div>
         
         {/* ログイン・新規登録モーダル */}
