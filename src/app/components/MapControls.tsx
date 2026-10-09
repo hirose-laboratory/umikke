@@ -29,28 +29,7 @@ export default function MapControls({
         pointerEvents: 'auto',
       }}
     >
-      {/* 現在地移動ボタン */}
-      <button
-        className="nav-btn"
-        onClick={handleJumpToCurrentLocation}
-        style={{
-          background: '#888',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '70px',
-          height: '70px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-        }}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>
-          near_me
-        </span>
-      </button>
+     
 
       {/* ズームコントロール (拡大 / 縮小) */}
       <div
