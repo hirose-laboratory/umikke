@@ -54,9 +54,10 @@ export default function TimelineBar({
       style={{
         position: 'absolute',
         bottom: '40px',
-        left: '30px',
-        width: 'calc(100% - 150px)',
-        maxWidth: '1200px',
+        left: '20px', // ★変更: 30pxから20pxに減らし、右側も指定して幅を広げる
+        right: '20px', // ★追加: 左右の余白を均等に20pxにする
+        width: 'auto', // ★変更: calc(100% - 150px) の制限を解除
+        maxWidth: 'none', // ★変更: 1200px の最大幅制限を解除
         background: '#888',
         borderRadius: '24px',
         minHeight: '180px',
@@ -100,18 +101,18 @@ export default function TimelineBar({
         </button>
 
         {/* タイムライン日付タブ一覧 */}
-<div
+        <div
           className="timeline"
           style={{
             display: 'flex',
             flexGrow: 1,
-            minWidth: 0, // ★追加: Flexbox内で正しくスクロールさせるための必須設定
-            justifyContent: 'flex-start', // ★変更: space-between から flex-start に変更
+            minWidth: 0, 
+            justifyContent: 'space-between', // ★変更: 幅が確保できたので flex-start から space-between に戻す
             fontSize: 'clamp(14px, 2.5vw, 30px)', 
             alignItems: 'center',
             overflow: 'auto',
             whiteSpace: 'nowrap',
-            gap: 'clamp(12px, 2vw, 24px)', // ★追加: space-betweenをやめた代わりに余白を指定
+            gap: '8px', // ★変更: space-betweenに合わせ、保険として最小限の余白(8px)だけ残す
           }}
         >
           {timelineDays.map((day, idx) => (
@@ -122,7 +123,7 @@ export default function TimelineBar({
                 setIsPlaying(false);
               }}
               style={{
-                flexShrink: 0, // ★追加: 日付テキストが押しつぶされるのを防ぐ
+                flexShrink: 0, 
                 color: currentDayIndex === idx ? '#ffdd55' : 'white',
                 borderBottom: currentDayIndex === idx ? '4px solid #ffdd55' : 'none',
                 paddingBottom: '4px',
