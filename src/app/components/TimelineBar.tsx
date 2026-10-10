@@ -110,7 +110,7 @@ export default function TimelineBar({
             // PC(1200px以上)では最大値の30pxになり、iPad(約800〜1000px)では20〜25px付近に滑らかに縮みます
             fontSize: 'clamp(14px, 2.5vw, 30px)', 
             alignItems: 'center',
-            overflow: 'hidden',
+            overflow: 'auto',
             whiteSpace: 'nowrap',
           }}
         >
