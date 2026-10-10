@@ -53,35 +53,35 @@ export default function TimelineBar({
       className="bottom-bar"
       style={{
         position: 'absolute',
-        // コンテナの配置と余白も画面幅に応じて可変に
-        bottom: 'clamp(16px, 3vw, 40px)',
-        left: 'clamp(12px, 2vw, 30px)',
+        bottom: '40px',
+        left: '30px',
         width: 'calc(100% - 150px)',
         maxWidth: '1200px',
         background: '#888',
         borderRadius: '24px',
-        minHeight: 'clamp(100px, 12vw, 180px)', // 高さも可変
+        minHeight: '180px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        padding: 'clamp(12px, 1.5vw, 24px) clamp(16px, 2vw, 32px)', // 内側の余白を可変
+        // 左右のパディングをiPadでは少し狭くしてスペースを稼ぐ
+        padding: '24px clamp(16px, 3vw, 32px)', 
         color: 'white',
-        gap: 'clamp(8px, 1vw, 16px)',
+        gap: '16px',
         boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
         boxSizing: 'border-box',
         pointerEvents: 'auto',
       }}
     >
       {/* 上段：再生ボタン / タイムラインタブ / ミニカレンダーボタン */}
-      <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 'clamp(8px, 1.5vw, 24px)' }}>
+      <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 'clamp(8px, 2vw, 24px)' }}>
         {/* 再生 / 一時停止ボタン */}
         <button
           className="play-btn"
           onClick={() => setIsPlaying(!isPlaying)}
           style={{
-            // 再生ボタンのサイズをPCの80px基準で画面幅に連動
-            width: 'clamp(32px, 6vw, 80px)',
-            height: 'clamp(32px, 6vw, 80px)',
+            // PCでは元の80px、iPadでは少し縮むように設定
+            width: 'clamp(56px, 6vw, 80px)',
+            height: 'clamp(56px, 6vw, 80px)',
             borderRadius: '50%',
             background: 'white',
             border: 'none',
@@ -94,7 +94,7 @@ export default function TimelineBar({
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: 'clamp(20px, 4vw, 56px)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 'clamp(40px, 4.5vw, 56px)' }}>
             {isPlaying ? 'pause' : 'play_arrow'}
           </span>
         </button>
@@ -106,8 +106,9 @@ export default function TimelineBar({
             display: 'flex',
             flexGrow: 1,
             justifyContent: 'space-between',
-            // ここの文字サイズがiPadの幅でも収まるように、より強く縮む比率(1.6vw)に設定
-            fontSize: 'clamp(10px, 1.6vw, 30px)', 
+            // ★ここが最重要ポイント★
+            // PC(1200px以上)では最大値の30pxになり、iPad(約800〜1000px)では20〜25px付近に滑らかに縮みます
+            fontSize: 'clamp(14px, 2.5vw, 30px)', 
             alignItems: 'center',
             overflow: 'hidden',
             whiteSpace: 'nowrap',
@@ -122,8 +123,8 @@ export default function TimelineBar({
               }}
               style={{
                 color: currentDayIndex === idx ? '#ffdd55' : 'white',
-                borderBottom: currentDayIndex === idx ? 'clamp(2px, 0.4vw, 4px) solid #ffdd55' : 'none',
-                paddingBottom: 'clamp(2px, 0.4vw, 4px)',
+                borderBottom: currentDayIndex === idx ? '4px solid #ffdd55' : 'none',
+                paddingBottom: '4px',
                 cursor: 'pointer',
                 fontWeight: currentDayIndex === idx ? 'bold' : 'normal',
               }}
@@ -134,11 +135,11 @@ export default function TimelineBar({
         </div>
 
         {/* ミニカレンダーポップアップ ＆ トグルアイコン */}
-        <div style={{ position: 'relative', flexShrink: 0, width: 'clamp(28px, 5vw, 64px)', height: 'clamp(28px, 5vw, 64px)' }}>
+        <div style={{ position: 'relative', flexShrink: 0, width: 'clamp(48px, 5vw, 64px)', height: 'clamp(48px, 5vw, 64px)' }}>
           <span
             className="material-symbols-outlined"
             onClick={() => setShowMiniCalendar(!showMiniCalendar)}
-            style={{ fontSize: 'clamp(24px, 4vw, 56px)', color: 'white', cursor: 'pointer' }}
+            style={{ fontSize: 'clamp(40px, 4.5vw, 56px)', color: 'white', cursor: 'pointer' }}
           >
             calendar_today
           </span>
@@ -148,14 +149,13 @@ export default function TimelineBar({
             <div
               style={{
                 position: 'absolute',
-                bottom: 'clamp(40px, 8vw, 80px)',
+                bottom: '80px',
                 right: '0px',
                 background: 'white',
                 color: '#333',
                 borderRadius: '16px',
                 padding: '16px',
-                // カレンダーの幅もiPadでは少し縮むように調整
-                width: 'clamp(260px, 30vw, 320px)',
+                width: '320px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                 display: 'flex',
                 flexDirection: 'column',
@@ -164,7 +164,7 @@ export default function TimelineBar({
               }}
             >
               {/* 年月ヘッダー / 前月・次月移動 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '18px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '20px', fontWeight: 'bold' }}>
                 <span
                   className="material-symbols-outlined"
                   style={{ cursor: 'pointer' }}
@@ -204,7 +204,7 @@ export default function TimelineBar({
               </div>
 
               {/* 日付グリッド */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', fontSize: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', fontSize: '16px' }}>
                 {calendarCells.map((dateNum, index) => {
                   const { isToday, isSelected } = getCalendarDayStatus(dateNum);
 
@@ -251,7 +251,7 @@ export default function TimelineBar({
       </div>
 
       {/* 下段：シークバー ＆ 選択日のラベル表示 */}
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'clamp(4px, 1vw, 8px)' }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <input
           type="range"
           min="0"
@@ -266,13 +266,13 @@ export default function TimelineBar({
             cursor: 'pointer',
             accentColor: 'white',
             background: 'rgba(255, 255, 255, 0.3)',
-            height: 'clamp(6px, 1vw, 10px)', // スライダーの太さも可変
+            height: '10px',
             borderRadius: '5px',
             outline: 'none',
           }}
         />
 
-        <div style={{ fontSize: 'clamp(12px, 1.8vw, 24px)', textAlign: 'left', color: '#e0e0e0', fontWeight: 'bold', paddingLeft: '4px' }}>
+        <div style={{ fontSize: 'clamp(16px, 2vw, 24px)', textAlign: 'left', color: '#e0e0e0', fontWeight: 'bold', paddingLeft: '4px' }}>
           選択日: <span style={{ color: '#ffdd55' }}>{formattedSelectedDate}</span>
         </div>
       </div>
