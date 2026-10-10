@@ -75,6 +75,7 @@ interface FishEdnaPinPoint {
   sample_date?: string;
   value?: number | string;
   dna_copies?: number;
+  target_timestamp?: string; // 追加
 }
 
 interface Hotpoint {
@@ -168,6 +169,7 @@ export default function HeatmapPage() {
 
   const [baseDate, setBaseDate] = useState<Date>(initDate);
   const [currentProgress, setCurrentProgress] = useState<number>(0);
+  const [debouncedProgress, setDebouncedProgress] = useState<number>(0); // 描画遅延用
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(false);
   const [calYear, setCalYear] = useState<number>(initDate.getFullYear());
@@ -239,7 +241,27 @@ export default function HeatmapPage() {
     setActiveFishLayers(val);
   }, [isLoggedIn]);
 
+  // ★ 負荷軽減：スライダーの値を150ms遅延させてマップ更新に反映させる
+  useEffect(() => {
+    if (isPlaying) {
+      setDebouncedProgress(currentProgress);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedProgress(currentProgress);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [currentProgress, isPlaying]);
+
+  // マップ描画用の日付（遅延反映）
   const selectedFullDate = useMemo(() => {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + debouncedProgress);
+    return d;
+  }, [baseDate, debouncedProgress]);
+
+  // UI表示用の日付（即時反映）
+  const displaySelectedDate = useMemo(() => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + currentProgress);
     return d;
@@ -472,9 +494,11 @@ export default function HeatmapPage() {
   }, [baseDate]);
 
   const formattedSelectedDate = useMemo(() => {
-    const y = selectedFullDate.getFullYear(); const m = selectedFullDate.getMonth() + 1; const d = selectedFullDate.getDate();
+    const y = displaySelectedDate.getFullYear(); 
+    const m = displaySelectedDate.getMonth() + 1; 
+    const d = displaySelectedDate.getDate();
     return `${y}年${m}月${d}日`;
-  }, [selectedFullDate]);
+  }, [displaySelectedDate]);
 
   // アニメーション表示（読み込み完了時のみ1.5秒間隔でコマを進める）
   useEffect(() => {
@@ -778,7 +802,6 @@ export default function HeatmapPage() {
         new Set(activeFishLayers.map((name) => getFishIdByName(name)))
       );
 
-      // --- baseDateから1週間分(0〜6日後)を取得 ---
       const startD = new Date(baseDate);
       const endD = new Date(baseDate);
       endD.setDate(endD.getDate() + 6);
@@ -787,52 +810,84 @@ export default function HeatmapPage() {
       const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}T23:59:59`;
 
       try {
+        // ヒートマップ（予測）は1週間分をまとめて取得（従来通り）
         const predictionRequests = fishIds.map((id) => {
           const predUrl = `${API_BASE_URL}/fish/${id}/edna-prediction?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
           return fetch(predUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
-        const pinRequests = fishIds.map((id) => {
-          const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
-          return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
-        });
-        const hotpointUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
-        const hotpointRequest = fetch(hotpointUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
+        
         const suggestionRequests = fishIds.map((id) => {
           const suggestUrl = `${API_BASE_URL}/fish/${id}/suggestions`;
           return fetch(suggestUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
         });
 
-        const [predictionResults, pinResults, rawHotpoints, suggestionResults] = await Promise.all([
+        // 🌟【最強対策】ピン（eDNA・ホットポイント）は1日ずつ7回個別に取得し、日付スタンプを強制付与する
+        const daysArray = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + offset);
+          return d;
+        });
+
+        const pinAndHotpointPromises = daysArray.map(async (d) => {
+          const dStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T00:00:00`;
+          const dEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T23:59:59`;
+
+          const pReqs = fishIds.map((id) => {
+            const pinUrl = `${API_BASE_URL}/fish/${id}/edna?start=${encodeURIComponent(dStart)}&end=${encodeURIComponent(dEnd)}`;
+            return fetch(pinUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
+          });
+
+          const hpUrl = `${API_BASE_URL}/fish/hotpoints/high-score?min_score=0.5&limit=50&start=${encodeURIComponent(dStart)}&end=${encodeURIComponent(dEnd)}`;
+          const hpReq = fetch(hpUrl).then((res) => (res.ok ? res.json() : [])).catch(() => []);
+
+          const [pResults, hpResult] = await Promise.all([Promise.all(pReqs), hpReq]);
+          
+          // フロントエンドで日付（target_timestamp）を明示的に付与
+          const flatP = pResults.flat().map((p: any) => ({ ...p, target_timestamp: dStart }));
+          let flatHp = hpResult.map((hp: any) => ({ ...hp, target_timestamp: dStart }));
+          
+          // 魚種フィルタ
+          flatHp = flatHp.filter((hp: any) => {
+            if (!hp.fish_id) return true;
+            return fishIds.includes(Number(hp.fish_id));
+          });
+
+          return { ednaPins: flatP, hotpoints: flatHp };
+        });
+
+        // 全てのリクエストを並列で待つ
+        const [predictionResults, suggestionResults, pinAndHpResults] = await Promise.all([
           Promise.all(predictionRequests),
-          Promise.all(pinRequests),
-          hotpointRequest,
           Promise.all(suggestionRequests),
+          Promise.all(pinAndHotpointPromises),
         ]);
 
         const flatPred = predictionResults.flat();
-        const flatPin = pinResults.flat();
         const flatSuggestions = suggestionResults.flat();
 
-        const filteredRawHotpoints = rawHotpoints.filter((hp: any) => {
-          if (!hp.fish_id) return true;
-          return fishIds.includes(Number(hp.fish_id));
-        });
+        const flatPin = pinAndHpResults.flatMap(r => r.ednaPins);
+        let allHotpoints: Hotpoint[] = [];
 
-        const enrichedHotpoints = filteredRawHotpoints.map((hp: any) => {
-          const suggestionObj = hp.fish_id 
-            ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
-            : null;
-          return {
-            ...hp,
-            suggestion: suggestionObj ? suggestionObj.suggestion_text : hp.suggestion,
-          };
+        // 🌟【最強対策】日ごとにピンの間引き（NMS）を行う
+        pinAndHpResults.forEach(r => {
+          const enrichedHp = r.hotpoints.map((hp: any) => {
+            const suggestionObj = hp.fish_id 
+              ? flatSuggestions.find((s: any) => s.fish_id === hp.fish_id) 
+              : null;
+            return {
+              ...hp,
+              suggestion: suggestionObj ? suggestionObj.suggestion_text : hp.suggestion,
+            };
+          });
+          
+          // その日の分だけ間引きを実行（別日の同じ場所が消えるのを防ぐ）
+          const filteredDailyHp = filterNearbyHotpoints(enrichedHp, 2.0);
+          allHotpoints = allHotpoints.concat(filteredDailyHp);
         });
-
-        const filteredHotpoints = filterNearbyHotpoints(enrichedHotpoints, 2.0);
 
         fishPointsRef.current = flatPred;
         setEdnaPinPoints(flatPin);
-        setHotpoints(filteredHotpoints);
+        setHotpoints(allHotpoints);
         setOceanDataVersion((v) => v + 1);
       } catch (err) {
         console.error('❌ 魚種データの予期せぬエラー:', err);
@@ -1088,7 +1143,8 @@ export default function HeatmapPage() {
 
     const todayEdnaPins = ednaPinPoints.filter((pin: any) => {
       const ts = pin.sample_date || pin.record_timestamp || pin.target_timestamp;
-      if (!ts) return true;
+      // 🌟【最強対策】タイムスタンプが無いデータは弾くように変更
+      if (!ts) return false; 
       const safeTimestamp = String(ts).replace(' ', 'T');
       const d = new Date(safeTimestamp);
       return d.getFullYear() === targetYear && d.getMonth() === targetMonth && d.getDate() === targetDateNum;
@@ -1137,7 +1193,8 @@ export default function HeatmapPage() {
 
     const todayHotpoints = hotpoints.filter((hp: any) => {
       const ts = hp.target_timestamp || hp.record_timestamp || hp.created_at;
-      if (!ts) return true;
+      // 🌟【最強対策】タイムスタンプが無いデータは弾くように変更
+      if (!ts) return false; 
       const safeTimestamp = String(ts).replace(' ', 'T');
       const d = new Date(safeTimestamp);
       return d.getFullYear() === targetYear && d.getMonth() === targetMonth && d.getDate() === targetDateNum;
@@ -1328,9 +1385,12 @@ export default function HeatmapPage() {
 
           {/* 下部タイムライン操作バー */}
           <TimelineBar
-            isPlaying={isPlaying} setIsPlaying={setIsPlaying} timelineDays={timelineDays} currentProgress={currentProgress} setCurrentProgress={setCurrentProgress}
-            showMiniCalendar={showMiniCalendar} setShowMiniCalendar={setShowMiniCalendar} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth}
-            calendarCells={calendarCells} getCalendarDayStatus={getCalendarDayStatus} setBaseDate={setBaseDate} formattedSelectedDate={formattedSelectedDate}
+            isPlaying={isPlaying} setIsPlaying={setIsPlaying} timelineDays={timelineDays} 
+            currentProgress={currentProgress} setCurrentProgress={setCurrentProgress}
+            showMiniCalendar={showMiniCalendar} setShowMiniCalendar={setShowMiniCalendar} 
+            calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth}
+            calendarCells={calendarCells} getCalendarDayStatus={getCalendarDayStatus} 
+            setBaseDate={setBaseDate} formattedSelectedDate={formattedSelectedDate}
           />
 
           {/* 右下マップ操作ボタン */}
