@@ -54,17 +54,15 @@ export default function TimelineBar({
       style={{
         position: 'absolute',
         bottom: '40px',
-        left: '20px', // ★変更: 30pxから20pxに減らし、右側も指定して幅を広げる
-        right: '20px', // ★追加: 左右の余白を均等に20pxにする
-        width: 'auto', // ★変更: calc(100% - 150px) の制限を解除
-        maxWidth: 'none', // ★変更: 1200px の最大幅制限を解除
+        left: '30px', // 元の設定に戻す
+        width: 'calc(100% - 150px)', // 元の設定に戻す
+        maxWidth: '1200px', // 元の設定に戻す
         background: '#888',
         borderRadius: '24px',
         minHeight: '180px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        // 左右のパディングをiPadでは少し狭くしてスペースを稼ぐ
         padding: '24px clamp(16px, 3vw, 32px)', 
         color: 'white',
         gap: '16px',
@@ -80,7 +78,6 @@ export default function TimelineBar({
           className="play-btn"
           onClick={() => setIsPlaying(!isPlaying)}
           style={{
-            // PCでは元の80px、iPadでは少し縮むように設定
             width: 'clamp(56px, 6vw, 80px)',
             height: 'clamp(56px, 6vw, 80px)',
             borderRadius: '50%',
@@ -106,13 +103,12 @@ export default function TimelineBar({
           style={{
             display: 'flex',
             flexGrow: 1,
-            minWidth: 0, 
-            justifyContent: 'space-between', // ★変更: 幅が確保できたので flex-start から space-between に戻す
+            minWidth: 0, // ★追加: 領域が足りない時に正しくスクロールさせるための必須設定
+            justifyContent: 'space-between', // 元の設定（均等配置）に戻す
             fontSize: 'clamp(14px, 2.5vw, 30px)', 
             alignItems: 'center',
-            overflow: 'auto',
+            overflowX: 'auto', // ★変更: hidden から auto に変更しスクロールを許可
             whiteSpace: 'nowrap',
-            gap: '8px', // ★変更: space-betweenに合わせ、保険として最小限の余白(8px)だけ残す
           }}
         >
           {timelineDays.map((day, idx) => (
@@ -123,7 +119,7 @@ export default function TimelineBar({
                 setIsPlaying(false);
               }}
               style={{
-                flexShrink: 0, 
+                flexShrink: 0, // ★追加: 日付テキストが押しつぶされるのを防ぐ
                 color: currentDayIndex === idx ? '#ffdd55' : 'white',
                 borderBottom: currentDayIndex === idx ? '4px solid #ffdd55' : 'none',
                 paddingBottom: '4px',
