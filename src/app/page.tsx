@@ -282,8 +282,13 @@ export default function HeatmapPage() {
   }, [marineTheme]);
 
   const chlLegendGradientStyle = useMemo(() => {
+    // テーマが変更された場合は、水温（SST）の凡例と同じテーマカラーを適用する
+    if (marineTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
+    if (marineTheme === 'ocean') return 'linear-gradient(to right, #001219, #005f73, #0a9396, #94d2bd)';
+    
+    // デフォルトテーマの場合のみ、クロロフィル専用のカラー（紫〜赤）を返す
     return 'linear-gradient(to right, #7b1fa2, #e91e63, #ff1744)';
-  }, []);
+  }, [marineTheme]);
 
   const fishLegendGradientStyle = useMemo(() => {
     if (fishTheme === 'rainbow') return 'linear-gradient(to right, blue, cyan, lime, yellow, red)';
