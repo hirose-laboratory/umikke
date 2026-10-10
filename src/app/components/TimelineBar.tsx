@@ -55,11 +55,10 @@ export default function TimelineBar({
         position: 'absolute',
         bottom: '40px',
         left: '30px',
-        // ★修正: デフォルトは calc(100% - 150px) を維持し、入らない場合だけ fit-content で伸ばす
-        width: 'fit-content',
-        minWidth: 'calc(100% - 150px)',
-        // ★修正: 画面幅を基準に広がる上限を設定 (7割〜9割など画面外にはみ出さないための保険)
-        maxWidth: 'clamp(70vw, 1200px, 95vw)',
+        // ★修正: 右側のパネル（約320px）＋余白分を引いて、絶対に被らない幅に固定
+        width: 'calc(100% - 380px)', 
+        minWidth: '500px', // 縮みすぎ防止の最低幅
+        maxWidth: '1200px',
         background: '#888',
         borderRadius: '24px',
         minHeight: '180px',
@@ -108,11 +107,12 @@ export default function TimelineBar({
             flexGrow: 1,
             minWidth: 0,
             justifyContent: 'space-between', 
-            // ★修正: gapを設定することで、縮んだ際も最低限の余白を死守して絶対にかぶらないようにする
-            gap: '12px',
-            fontSize: 'clamp(14px, 2.5vw, 30px)', 
+            // ★修正: 画面幅に合わせて隙間も細かく縮むように設定
+            gap: 'clamp(4px, 1vw, 16px)',
+            // ★修正: 文字サイズの下限を10pxまで下げ、幅に合わせて柔軟に縮むように変更
+            fontSize: 'clamp(10px, 1.6vw, 24px)', 
             alignItems: 'center',
-            overflowX: 'auto', // 最終的に入りきらない分はスクロール
+            overflowX: 'auto', 
             whiteSpace: 'nowrap',
           }}
         >
@@ -124,7 +124,6 @@ export default function TimelineBar({
                 setIsPlaying(false);
               }}
               style={{
-                // ★修正: 要素が絶対に潰れない・かぶらないように flexShrink を 0 に固定
                 flexShrink: 0,
                 color: currentDayIndex === idx ? '#ffdd55' : 'white',
                 borderBottom: currentDayIndex === idx ? '4px solid #ffdd55' : 'none',
