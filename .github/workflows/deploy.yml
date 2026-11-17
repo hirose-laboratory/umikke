@@ -27,7 +27,7 @@ jobs:
           --exclude=".env.local" \
           --exclude="README.md" \
           -e "ssh -o StrictHostKeyChecking=no" \
-          ./ ubuntu@27.133.132.208:/home/ubuntu/frontend/umikke/
+          ./ umikke@163.43.230.76:/home/umikke/frontend/
     - name: Build Project
       env:
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
