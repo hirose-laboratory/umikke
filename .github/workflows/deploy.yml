@@ -32,7 +32,7 @@ jobs:
       env:
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
       run: |
-        sshpass -e ssh -o StrictHostKeyChecking=no ubuntu@27.133.132.208 << 'EOF'
+        sshpass -e ssh -o StrictHostKeyChecking=no umikke@163.43.230.76 << 'EOF'
           cd /home/ubuntu/frontend/umikke
           npm install
           npm run build
